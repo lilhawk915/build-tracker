@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.local
+*.local
+.DS_Store
+supabase/.temp
+supabase/.branches
+# Holds real admin emails for the local system. Not for a public repo.
+supabase/seed.sql
+tsconfig.tsbuildinfo
