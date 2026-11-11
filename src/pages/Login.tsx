@@ -3,17 +3,21 @@ import { store } from '../data';
 
 export function Login() {
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [sent, setSent] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const clean = () => email.trim().toLowerCase();
 
-  async function go(e: FormEvent) {
+  async function send(e: FormEvent) {
     e.preventDefault();
     setErr('');
     setMsg('');
     setBusy(true);
     try {
-      setMsg(await store.signIn(email.trim().toLowerCase()));
+      setMsg(await store.signIn(clean()));
+      setSent(true);
     } catch (x) {
       setErr((x as Error).message);
     } finally {
@@ -21,19 +25,44 @@ export function Login() {
     }
   }
 
+  // A phone home-screen app can't receive the emailed link, so the code signs in right here.
+  async function check(e: FormEvent) {
+    e.preventDefault();
+    setErr('');
+    setBusy(true);
+    try {
+      await store.verifyCode(clean(), code);
+    } catch (x) {
+      setErr((x as Error).message);
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="center">
-      <form className="panel login" onSubmit={go}>
+      <div className="panel login">
         <h1>Build Tracker</h1>
-        <label className="field">
-          Email
-          <input type="email" required autoFocus autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <span className="help">We'll email you a sign-in link. You need an invite from the owner first.</span>
-        </label>
-        <button className="btn primary" disabled={busy}>Email me a link</button>
+        <form className="stack" onSubmit={send}>
+          <label className="field">
+            Email
+            <input type="email" required autoFocus={!sent} autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <span className="help">We'll email you a sign-in code and link. You need an invite from the owner first.</span>
+          </label>
+          <button className={`btn${sent ? '' : ' primary'}`} disabled={busy}>{sent ? 'Send a new code' : 'Email me a code'}</button>
+        </form>
         {msg && <div className="alert calm" role="status">{msg}</div>}
+        {sent && (
+          <form className="stack" onSubmit={check}>
+            <label className="field">
+              Code from the email
+              <input inputMode="numeric" autoComplete="one-time-code" autoFocus required pattern="[0-9 ]{6,10}" value={code} onChange={(e) => setCode(e.target.value)} />
+              <span className="help">Or tap the link in the email on this device.</span>
+            </label>
+            <button className="btn primary" disabled={busy}>Sign in</button>
+          </form>
+        )}
         {err && <div className="alert" role="alert">{err}</div>}
-      </form>
+      </div>
     </div>
   );
 }

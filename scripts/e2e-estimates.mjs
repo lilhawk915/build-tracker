@@ -1,0 +1,310 @@
+// Stage 3 check: the Estimates screens on the real local system, as an admin and as staff.
+// Needs: npm run local:start and npm run dev. Usage: node scripts/e2e-estimates.mjs <screenshot-dir>
+import { execSync } from 'node:child_process';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { chromium } from 'playwright';
+
+const out = process.argv[2] ?? '/tmp/est-shots';
+mkdirSync(out, { recursive: true });
+const BASE = 'http://127.0.0.1:5183';
+const API = 'http://127.0.0.1:54321';
+const MAIL = 'http://127.0.0.1:54324';
+const status = JSON.parse(execSync('npx supabase status -o json 2>/dev/null').toString());
+const SERVICE = status.SERVICE_ROLE_KEY;
+const ANON = status.ANON_KEY;
+const sql = (q) => execSync('docker exec -i supabase_db_build-tracker psql -U postgres -d postgres -At', { input: q }).toString().trim();
+
+const results = [];
+const problems = [];
+const check = (name, ok, detail = '') => { results.push({ name, ok: Boolean(ok), detail }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && detail ? ` :: ${detail}` : ''}`); };
+async function step(name, page, fn) {
+  try { await fn(); } catch (e) {
+    check(`${name} (stopped early)`, false, String(e.message).split('\n')[0].slice(0, 200));
+    await page.screenshot({ path: `${out}/FAILED-${name.replace(/\W+/g, '-')}.png`, fullPage: true }).catch(() => {});
+  }
+}
+
+async function makeUser(email, role) {
+  sql(`insert into public.team_invites (email, role) values ('${email}', '${role}') on conflict (email) do update set role = '${role}';`);
+  await fetch(`${API}/auth/v1/admin/users`, { method: 'POST', headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, email_confirm: true }) });
+}
+async function signIn(page, email) {
+  await page.goto(BASE);
+  await page.getByLabel('Email').fill(email);
+  await new Promise((r) => setTimeout(r, 1500));
+  const t = Date.now();
+  await page.getByRole('button', { name: 'Email me a code' }).click();
+  await page.getByText('Check your email').waitFor();
+  for (let i = 0; i < 40; i++) {
+    const list = await (await fetch(`${MAIL}/api/v1/messages?limit=30`)).json();
+    const m = list.messages.find((x) => x.To.some((y) => y.Address === email) && Date.parse(x.Created) >= t - 2000);
+    if (m) {
+      const full = await (await fetch(`${MAIL}/api/v1/message/${m.ID}`)).json();
+      const link = (full.Text + full.HTML).match(/https?:\/\/[^\s"'<>]+verify[^\s"'<>]+/)[0].replace(/&amp;/g, '&');
+      await page.goto(link);
+      await page.locator('.topbar').waitFor();
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`no email for ${email}`);
+}
+const tokenOf = (page) => page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes('auth-token')) return JSON.parse(localStorage.getItem(k)).access_token; return null; });
+const rest = async (page, path, init = {}) => {
+  const res = await fetch(`${API}/rest/v1/${path}`, { ...init, headers: { apikey: ANON, Authorization: `Bearer ${await tokenOf(page)}`, 'Content-Type': 'application/json', Prefer: 'return=representation', ...(init.headers ?? {}) } });
+  return { status: res.status, json: await res.json().catch(() => null) };
+};
+// Commits a number box the way a person does: type, then Enter.
+const typeIn = async (loc, value) => { await loc.click(); await loc.fill(String(value)); await loc.press('Enter'); };
+const settle = (page) => page.waitForTimeout(400);
+
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const mk = async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1360, height: 900 }, acceptDownloads: true });
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(12000);
+  page.on('dialog', (d) => d.accept());
+  page.on('pageerror', (e) => problems.push(e.message));
+  return page;
+};
+
+await makeUser('estadmin@test.local', 'admin');
+await makeUser('eststaff@test.local', 'staff');
+const admin = await mk();
+const staff = await mk();
+await signIn(admin, 'estadmin@test.local');
+await signIn(staff, 'eststaff@test.local');
+let estId = '';
+
+await step('settings', admin, async () => {
+  await admin.goto(`${BASE}/estimates/settings`);
+  await admin.getByRole('heading', { name: 'Quote settings' }).waitFor();
+  await admin.getByLabel('Company name').fill('Test Builders LLC');
+  await admin.getByLabel('Company name').press('Enter');
+  await admin.locator('.toast', { hasText: 'Saved' }).first().waitFor();
+  await typeIn(admin.getByLabel('Default Profit'), 10);
+  await admin.waitForTimeout(800);
+  check('Admin sets company name and default profit', sql(`select name from public.company_settings;`) === 'Test Builders LLC' && sql(`select profit_pct from public.markup_defaults;`) === '10');
+});
+
+await step('custom estimate', admin, async () => {
+  await admin.goto(`${BASE}/estimates`);
+  await admin.getByRole('button', { name: 'New estimate' }).click();
+  await admin.getByRole('dialog').getByLabel('Client or job name').fill('Sample Rd - Concrete');
+  await admin.getByRole('dialog').getByLabel('Property address').fill('100 Sample Rd');
+  await admin.getByRole('dialog').getByRole('button', { name: 'Start estimate' }).click();
+  await admin.getByRole('heading', { name: 'Profit and markups' }).waitFor();
+  estId = new URL(admin.url()).pathname.split('/').pop();
+  check('Start a custom quote', estId.length > 20);
+  check('New quote starts with the default 10% profit', sql(`select profit_pct from public.estimate_markups where estimate_id = '${estId}';`) === '10');
+  for (const [name, total] of [['Concrete, all pads and step', 3000], ['Gravel and rebar', 500], ['Labor: forming, placing and finishing', 1400]]) {
+    await admin.getByLabel('Add a line').selectOption('Foundation');
+    await settle(admin);
+    const nameBox = admin.getByLabel('Name of Custom line').last();
+    await nameBox.fill(name);
+    await nameBox.press('Enter');
+    await settle(admin);
+    const totalBox = admin.getByLabel(`Total of ${name}`, { exact: true });
+    await typeIn(totalBox, total);
+    await settle(admin);
+  }
+  // The labor line: move its whole amount into labor.
+  await typeIn(admin.getByLabel('Labor total of Labor: forming, placing and finishing', { exact: true }), 1400);
+  await typeIn(admin.getByLabel('Material total of Labor: forming, placing and finishing', { exact: true }), 0);
+  await settle(admin);
+  await typeIn(admin.getByLabel('Profit dollars'), 4900);
+  await admin.waitForTimeout(1200);
+  const grand = await admin.locator('.mkrow.strong').innerText();
+  check('Typed amounts and a flat $4,900 profit total $9,800', grand.includes('$9,800.00'), grand.replace(/\s+/g, ' '));
+  await admin.screenshot({ path: `${out}/est-01-custom.png`, fullPage: true });
+  await admin.reload();
+  await admin.getByRole('heading', { name: 'Profit and markups' }).waitFor();
+  check('Everything is saved: still $9,800 after a reload', (await admin.locator('.mkrow.strong').innerText()).includes('$9,800.00'));
+  const row = JSON.parse(sql(`select json_build_object('lines', jsonb_array_length(custom_lines), 'profit', m.profit_amount) from public.estimates e join public.estimate_markups m on m.estimate_id = e.id where e.id = '${estId}';`));
+  check('Saved in the database: 3 lines and the $4,900 profit', row.lines === 3 && Number(row.profit) === 4900, JSON.stringify(row));
+});
+
+await step('pdfs', admin, async () => {
+  for (const [button, kind] of [['Client quote PDF', 'quote'], ['Internal PDF', 'INTERNAL']]) {
+    const [dl] = await Promise.all([admin.waitForEvent('download', { timeout: 30000 }), admin.getByRole('button', { name: button }).click()]);
+    await dl.saveAs(`${out}/${kind}.pdf`);
+    const path = `${out}/${kind}.pdf`;
+    const bytes = readFileSync(path);
+    check(`${button} downloads a real PDF`, bytes.subarray(0, 4).toString() === '%PDF' && bytes.length > 2000 && dl.suggestedFilename().includes(kind), `${dl.suggestedFilename()} ${bytes.length} bytes`);
+  }
+  const [csv] = await Promise.all([admin.waitForEvent('download'), admin.getByRole('button', { name: 'Download lines (CSV)' }).click()]);
+  check('Lines download as a spreadsheet', readFileSync(await csv.path(), 'utf8').includes('Gravel and rebar'));
+});
+
+await step('versions', admin, async () => {
+  await admin.getByRole('link', { name: /Saved versions/ }).click();
+  await admin.getByRole('button', { name: 'Save a version' }).click();
+  await admin.getByRole('dialog').getByLabel('Label').fill('Sent to client');
+  await admin.getByRole('dialog').getByRole('button', { name: 'Save version' }).click();
+  await admin.locator('.toast', { hasText: 'Version saved' }).waitFor();
+  check('Save a version', (await admin.locator('main').innerText()).includes('Sent to client'));
+  await admin.getByRole('link', { name: 'Line items' }).click();
+  await typeIn(admin.getByLabel('Profit dollars'), 6000);
+  await admin.waitForTimeout(1000);
+  check('Change the profit after saving', (await admin.locator('.mkrow.strong').innerText()).includes('$10,900.00'));
+  await admin.getByRole('link', { name: /Saved versions/ }).click();
+  check('The version still shows its own total', (await admin.locator('tr', { hasText: 'Sent to client' }).innerText()).includes('$9,800.00'));
+  await admin.locator('tr', { hasText: 'Sent to client' }).getByRole('button', { name: 'Restore' }).click();
+  await admin.locator('.toast', { hasText: 'Restored' }).waitFor();
+  await admin.getByRole('heading', { name: 'Profit and markups' }).waitFor();
+  check('Restore puts the $9,800 quote back', (await admin.locator('.mkrow.strong').innerText()).includes('$9,800.00'));
+  check('Restoring saved the changed quote as a version first', Number(sql(`select count(*) from public.estimate_versions where estimate_id = '${estId}';`)) === 2);
+  check('Restore is saved in the database', Number(sql(`select profit_amount from public.estimate_markups where estimate_id = '${estId}';`)) === 4900);
+});
+
+await step('staff view', staff, async () => {
+  await staff.goto(`${BASE}/estimates`);
+  await staff.getByRole('heading', { name: 'Estimates' }).waitFor();
+  let t = await staff.locator('main').innerText();
+  check('Staff see the estimate at cost: $4,900, not $9,800', t.includes('Sample Rd - Concrete') && t.includes('$4,900.00') && !t.includes('$9,800'));
+  await staff.getByRole('link', { name: 'Sample Rd - Concrete' }).click();
+  await staff.getByText('You see costs only').waitFor();
+  t = await staff.locator('main').innerText();
+  check('Staff see no profit, markups, PDFs, or versions', !t.includes('Profit and markups') && !t.includes('$9,800') && await staff.getByRole('button', { name: 'Client quote PDF' }).count() === 0 && await staff.getByRole('link', { name: /Saved versions/ }).count() === 0);
+  await typeIn(staff.getByLabel('Total of Gravel and rebar', { exact: true }), 650);
+  await staff.waitForTimeout(1000);
+  check('Staff can edit a line', (await rest(staff, `estimates?id=eq.${estId}&select=line_edits`)).json[0].line_edits && sql(`select count(*) from public.estimates where id = '${estId}' and line_edits::text like '%650%';`) === '1');
+  for (const t2 of ['estimate_markups', 'estimate_versions', 'markup_defaults']) {
+    check(`Staff read nothing from ${t2} through the API`, ((await rest(staff, t2)).json ?? []).length === 0);
+  }
+  const forced = await rest(staff, `estimate_markups?estimate_id=eq.${estId}`, { method: 'PATCH', body: JSON.stringify({ profit_amount: 1 }) });
+  check('Staff cannot change profit through the API', (forced.json ?? []).length === 0);
+  await staff.goto(`${BASE}/estimates/settings`);
+  await staff.waitForTimeout(500);
+  check('Staff are kept off Quote settings', (await staff.locator('main').innerText()).includes('Quote settings are for admins'));
+  await staff.screenshot({ path: `${out}/est-02-staff.png`, fullPage: true });
+});
+
+await step('starter catalog', admin, async () => {
+  await admin.goto(`${BASE}/estimates/catalog`);
+  await admin.getByRole('heading', { name: 'Price catalog' }).waitFor();
+  check('An empty catalog says so and offers the starter list', (await admin.locator('main').innerText()).includes('The catalog is empty'));
+  await admin.getByRole('button', { name: 'Load starter catalog' }).click();
+  await admin.locator('.toast', { hasText: 'Starter catalog loaded' }).waitFor();
+  check('Load the starter catalog: 133 placeholder prices', sql('select count(*) from public.catalog_items where not verified;') === '133');
+});
+
+await step('house estimate', admin, async () => {
+  await admin.goto(`${BASE}/estimates`);
+  await admin.getByRole('button', { name: 'New estimate' }).click();
+  await admin.getByRole('dialog').getByLabel('Client or job name').fill('Sample house');
+  await admin.getByRole('dialog').getByLabel('Type').selectOption('house');
+  await admin.getByRole('dialog').getByRole('button', { name: 'Start estimate' }).click();
+  await admin.getByRole('heading', { name: 'Profit and markups' }).waitFor();
+  const before = await admin.locator('table.lines tbody tr:not(.division)').count();
+  check('A house estimate fills in lines from the house details', before > 30, `${before} lines`);
+  const total1 = await admin.locator('.mkrow.strong').innerText();
+  await admin.getByRole('link', { name: 'House details' }).click();
+  await typeIn(admin.getByLabel('Heated sq ft'), 3200);
+  await admin.waitForTimeout(800);
+  await admin.screenshot({ path: `${out}/est-03-house-details.png`, fullPage: true });
+  await admin.getByRole('link', { name: 'Line items' }).click();
+  const total2 = await admin.locator('.mkrow.strong').innerText();
+  check('Changing the size reprices the house', total1 !== total2, `${total1} -> ${total2}`);
+  check('Placeholder prices are flagged', (await admin.locator('main').innerText()).includes('placeholder prices'));
+  await admin.getByLabel('Delete Excavation & site prep').first().click().catch(async () => { await admin.locator('button[aria-label^="Delete "]').first().click(); });
+  await settle(admin);
+  check('Deleting a calculated line puts it in Removed lines', (await admin.locator('main').innerText()).includes('Removed lines (1)'));
+  await admin.getByRole('button', { name: 'Restore' }).first().click();
+  await settle(admin);
+  check('Restore a removed line', !(await admin.locator('main').innerText()).includes('Removed lines'));
+  await admin.screenshot({ path: `${out}/est-04-house.png`, fullPage: true });
+});
+
+await step('catalog', admin, async () => {
+  await admin.goto(`${BASE}/estimates/catalog`);
+  await admin.getByRole('heading', { name: 'Price catalog' }).waitFor();
+  const first = admin.locator('table.lines tbody tr').first();
+  const label = await first.locator('input[aria-label^="Material price of"]').getAttribute('aria-label');
+  const name = label.replace('Material price of ', '');
+  await typeIn(first.locator('input[aria-label^="Material price of"]'), 2.875);
+  await admin.waitForTimeout(800);
+  const row = JSON.parse(sql(`select json_build_object('cost', unit_cost::text, 'verified', verified) from public.catalog_items where name = '${name.replace(/'/g, "''")}' limit 1;`));
+  check('Typing a catalog price keeps it exact and marks it verified', row.cost === '2.875' && row.verified === true, JSON.stringify(row));
+  const [dl] = await Promise.all([admin.waitForEvent('download'), admin.getByRole('button', { name: 'Export CSV' }).click()]);
+  check('Export the catalog as CSV', readFileSync(await dl.path(), 'utf8').includes('2.875'));
+  await admin.screenshot({ path: `${out}/est-05-catalog.png`, fullPage: true });
+});
+
+await step('delete', admin, async () => {
+  await admin.goto(`${BASE}/estimates`);
+  await admin.getByRole('link', { name: 'Sample house' }).click();
+  await admin.getByRole('heading', { name: 'Profit and markups' }).waitFor();
+  await admin.getByRole('button', { name: 'Delete this estimate' }).click();
+  await admin.getByRole('heading', { name: 'Estimates' }).waitFor();
+  check('Admin deletes an estimate', !(await admin.locator('main').innerText()).includes('Sample house'));
+});
+
+await step('code sign-in', staff, async () => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const phone = await ctx.newPage();
+  phone.setDefaultTimeout(12000);
+  await phone.goto(BASE);
+  await phone.getByLabel('Email').fill('eststaff@test.local');
+  await new Promise((r) => setTimeout(r, 1500));
+  const t = Date.now();
+  await phone.getByRole('button', { name: 'Email me a code' }).click();
+  await phone.getByLabel('Code from the email').waitFor();
+  let code = null;
+  for (let i = 0; i < 40 && !code; i++) {
+    const list = await (await fetch(`${MAIL}/api/v1/messages?limit=30`)).json();
+    const m = list.messages.find((x) => x.To.some((y) => y.Address === 'eststaff@test.local') && Date.parse(x.Created) >= t - 2000);
+    if (m) {
+      const full = await (await fetch(`${MAIL}/api/v1/message/${m.ID}`)).json();
+      check('The email says it is a sign-in code', m.Subject.includes('sign-in code'), m.Subject);
+      code = (full.Text + full.HTML).match(/\b\d{6}\b/)?.[0] ?? null;
+    }
+    if (!code) await new Promise((r) => setTimeout(r, 250));
+  }
+  check('The email carries a 6-digit code', Boolean(code));
+  await phone.getByLabel('Code from the email').fill('000000');
+  await phone.getByRole('button', { name: 'Sign in' }).click();
+  await phone.locator('.alert', { hasText: 'wrong or has expired' }).waitFor();
+  check('A wrong code is refused in plain words', true);
+  await phone.getByLabel('Code from the email').fill(code);
+  await phone.getByRole('button', { name: 'Sign in' }).click();
+  await phone.locator('.topbar').waitFor();
+  check('Typing the code signs in on the phone, no link needed', (await phone.locator('main').innerText()).includes('Today'));
+  await ctx.close();
+});
+
+await step('import', admin, async () => {
+  await admin.goto(`${BASE}/estimates/import`);
+  await admin.getByRole('heading', { name: 'Import from Estimator' }).waitFor();
+  await admin.getByLabel('Estimator file').setInputFiles('tests/fixtures/sample-concrete.estimator.json');
+  const preview = await admin.locator('section[aria-label="What will be imported"]').innerText();
+  check('Import shows what will come in before saving', preview.includes('100 Sample Rd - Concrete') && preview.includes('$9,800.00') && preview.includes('Import'));
+  await admin.getByRole('button', { name: 'Import', exact: true }).click();
+  await admin.locator('section[aria-label="Import check"]').waitFor();
+  const after = await admin.locator('section[aria-label="Import check"]').innerText();
+  check('After import it re-prices from what was saved: $9,800 matches', after.includes('$9,800.00') && after.includes('Matches'), after.replace(/\s+/g, ' '));
+  check('Imported with the flat $4,900 profit', sql(`select m.profit_amount from public.estimate_markups m join public.estimates e on e.id = m.estimate_id where e.legacy_id = 'sample-concrete';`) === '4900');
+  await admin.goto(`${BASE}/estimates/import`);
+  await admin.getByLabel('Estimator file').setInputFiles('tests/fixtures/sample-concrete.estimator.json');
+  check('Importing the same file again is skipped', (await admin.locator('section[aria-label="What will be imported"]').innerText()).includes('Already imported, skip'));
+  await admin.screenshot({ path: `${out}/est-07-import.png`, fullPage: true });
+  const res = await fetch(`${BASE}/manifest.webmanifest`);
+  const man = await res.json().catch(() => ({}));
+  check('Phone install file is served with the app name and icons', man.name === 'Build Tracker' && man.display === 'standalone' && man.icons?.length === 3);
+  check('App icon is served', (await fetch(`${BASE}/icon-192.png`)).headers.get('content-type')?.includes('image/png'));
+});
+
+await step('phone', admin, async () => {
+  await admin.setViewportSize({ width: 390, height: 844 });
+  await admin.goto(`${BASE}/estimates/${estId}`);
+  await admin.getByRole('heading', { name: 'Profit and markups' }).waitFor();
+  const over = await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  check('Estimate page fits a phone screen (line table scrolls inside its box)', over <= 0, `${over}px`);
+  await admin.screenshot({ path: `${out}/est-06-phone.png`, fullPage: true });
+});
+
+check('No crashes in the browser', problems.length === 0, problems.slice(0, 3).join(' | '));
+await browser.close();
+const failed = results.filter((r) => !r.ok);
+console.log(`\n${results.length - failed.length} passed, ${failed.length} failed`);
+process.exit(failed.length ? 1 : 0);

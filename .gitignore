@@ -9,3 +9,4 @@ supabase/.branches
 # Holds real admin emails for the local system. Not for a public repo.
 supabase/seed.sql
 tsconfig.tsbuildinfo
+tests/*.local.test.ts

@@ -1,6 +1,6 @@
 # Build Tracker test report
 
-Run 11/9/2026, 12:57:35 AM Eastern against the real system on this computer.
+Run 11/10/2026, 11:32:28 PM Eastern against the real system on this computer.
 **330 of 330 checks passed.** Automatic texts went only to a fake Kixie on this Mac. Nothing left this computer.
 
 ## Logins and team
@@ -221,7 +221,7 @@ Run 11/9/2026, 12:57:35 AM Eastern against the real system on this computer.
 - Pass: Crew finish a task
 - Pass: Crew mark a delivery arrived
 - Pass: Crew ask for materials
-- Pass: Crew are sent home from /jobs/01dadee6-02cb-45a1-9a3e-7f74894dccc7/budget
+- Pass: Crew are sent home from /jobs/c681edc3-5b95-4e27-bf5a-d2842b2929fc/budget
 - Pass: Crew are sent home from /subs
 - Pass: Crew are sent home from /calls
 - Pass: Crew are sent home from /search
@@ -266,7 +266,7 @@ Run 11/9/2026, 12:57:35 AM Eastern against the real system on this computer.
 - Pass: Sub reads nothing from notifications through the API
 - Pass: Sub reads nothing from auto_texts through the API
 - Pass: Sub reads nothing from auto_text_settings through the API
-- Pass: Sub is sent home from /jobs/01dadee6-02cb-45a1-9a3e-7f74894dccc7/budget
+- Pass: Sub is sent home from /jobs/c681edc3-5b95-4e27-bf5a-d2842b2929fc/budget
 - Pass: Sub is sent home from /subs
 - Pass: Sub is sent home from /search
 - Pass: Sub is sent home from /calls

@@ -4,6 +4,11 @@ import { Toast } from './components/ui';
 import { DataProvider, store, useData } from './data';
 import { canSeeContacts, type Profile } from './domain/types';
 import { AutoTextsPage } from './pages/AutoTextsPage';
+import { CatalogPage } from './pages/estimates/CatalogPage';
+import { EstimatePage } from './pages/estimates/EstimatePage';
+import { EstimateSettingsPage } from './pages/estimates/EstimateSettingsPage';
+import { EstimatesPage } from './pages/estimates/EstimatesPage';
+import { ImportPage } from './pages/estimates/ImportPage';
 import { CallsPage } from './pages/CallsPage';
 import { CrewHome } from './pages/CrewHome';
 import { DrawSheetPage } from './pages/DrawSheetPage';
@@ -39,6 +44,7 @@ function Shell({ me, onSignOut }: { me: Profile; onSignOut: () => void }) {
         <nav aria-label="Main">
           {staff && <NavLink to="/" end>Today</NavLink>}
           {staff && <NavLink to="/calls">Call list</NavLink>}
+          {staff && <NavLink to="/estimates">Estimates</NavLink>}
           {staff && <NavLink to="/search">All jobs</NavLink>}
           {canSeeContacts(me) && <NavLink to="/texts">Auto texts</NavLink>}
           {staff && <NavLink to="/subs">Subs</NavLink>}
@@ -75,6 +81,11 @@ function Shell({ me, onSignOut }: { me: Profile; onSignOut: () => void }) {
               <>
                 <Route path="/" element={<Today />} />
                 <Route path="/search" element={<SearchPage />} />
+                <Route path="/estimates" element={<EstimatesPage />} />
+                <Route path="/estimates/catalog" element={<CatalogPage />} />
+                <Route path="/estimates/import" element={me.role === 'admin' ? <ImportPage /> : <div className="alert">Importing is for admins.</div>} />
+                <Route path="/estimates/settings" element={me.role === 'admin' ? <EstimateSettingsPage /> : <div className="alert">Quote settings are for admins.</div>} />
+                <Route path="/estimates/:estimateId" element={<EstimatePage />} />
                 <Route path="/calls" element={<CallsPage />} />
                 {canSeeContacts(me) && <Route path="/texts" element={<AutoTextsPage />} />}
                 <Route path="/subs" element={<Subs />} />

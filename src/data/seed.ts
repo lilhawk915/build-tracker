@@ -1,5 +1,8 @@
 // Sample data for demo mode only. Dates are relative to today so the demo always has live flags.
 import { todayIso } from '../domain/rules';
+import { catalogToRow } from '../estimator/convert';
+import { seedCatalog } from '../estimator/domain/catalog/seed';
+import { defaultSettings } from '../estimator/domain/house/defaults';
 import { addDays } from '../domain/schedule';
 import { starterBudget, starterSchedule } from '../domain/templates';
 import type { Tables } from '../domain/types';
@@ -18,6 +21,10 @@ export function seed(): DB {
   const db: DB = {
     vendors: [], profiles: [], team_invites: [], jobs: [], budget_lines: [], pos: [], bills: [], change_orders: [],
     draws: [], draw_lines: [], lien_waivers: [], tasks: [], daily_logs: [], photos: [], selections: [], documents: [], job_steps: [], scope_items: [], materials: [], notifications: [], vendor_contacts: [], auto_texts: [],
+    estimates: [], estimate_markups: [], estimate_versions: [], expenses: [],
+    catalog_items: seedCatalog().map(catalogToRow),
+    company_settings: [{ id: 'main', name: 'Sample Builders', address: '', phone: '', email: '', license: '', logo_data_url: null, default_assumptions: defaultSettings().defaultAssumptions, default_validity_days: 30 }],
+    markup_defaults: [{ id: 'main', sales_tax_pct: 0, contingency_pct: 0, overhead_pct: 0, profit_pct: 10 }],
     auto_text_settings: [{ id: 'main', enabled: false, sender_name: 'H3 Office', notice_days: 7, reminder_days: 1, start_hour: 9, end_hour: 18, daily_cap: 25 }],
   };
   const vendor = (id: string, name: string, trade: string, contact_name: string, coi: string | null) => {

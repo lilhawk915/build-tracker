@@ -96,7 +96,7 @@ async function signInWithLink(key) {
   await p.page.getByLabel('Email').fill(p.email);
   await new Promise((r) => setTimeout(r, 1500)); // the login system allows one link a second per person
   const t = Date.now();
-  await p.page.getByRole('button', { name: 'Email me a link' }).click();
+  await p.page.getByRole('button', { name: 'Email me a code' }).click();
   await p.page.getByText('Check your email').waitFor();
   await p.page.goto(await latestLink(p.email, t));
   await p.page.locator('.topbar').waitFor();
@@ -160,7 +160,7 @@ await step('first owner login', async () => {
 });
 await step('magic link', async () => {
   await people.owner.page.locator('.who').getByRole('button', { name: 'Sign out' }).click();
-  await current.getByRole('button', { name: 'Email me a link' }).waitFor();
+  await current.getByRole('button', { name: 'Email me a code' }).waitFor();
   check('Sign out returns to the login screen', true);
   await signInWithLink('owner');
   check('Sign in again with an emailed link', (await text()).includes('Today'));
@@ -172,7 +172,7 @@ await step('stranger refused', async () => {
   const p = use('stranger');
   await p.goto(BASE);
   await p.getByLabel('Email').fill(STRANGER);
-  await p.getByRole('button', { name: 'Email me a link' }).click();
+  await p.getByRole('button', { name: 'Email me a code' }).click();
   await p.locator('.alert').waitFor();
   check('Uninvited email is refused in plain language', (await p.locator('.alert').innerText()).includes("hasn't been invited"));
   const open = await fetch(`${API}/auth/v1/signup`, { method: 'POST', headers: { apikey: ANON, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'walkin@test.local', password: 'Walkin12345!' }) });
@@ -1540,7 +1540,7 @@ await step('webkit', async () => {
     await page.getByLabel('Email').fill(email);
     await new Promise((r) => setTimeout(r, 1500));
     const t0 = Date.now();
-    await page.getByRole('button', { name: 'Email me a link' }).click();
+    await page.getByRole('button', { name: 'Email me a code' }).click();
     await page.getByText('Check your email').waitFor();
     await page.goto(await latestLink(email, t0));
     await page.getByRole('heading', { name: heading }).waitFor();
@@ -1564,7 +1564,7 @@ await step('webkit', async () => {
       check('Sub sends a photo on iPhone', (await rest('owner', 'photos?file_path=ilike.*iphone.png&select=review_status')).json[0]?.review_status === 'pending');
     }
     await page.getByRole('button', { name: 'Sign out' }).first().click();
-    await page.getByRole('button', { name: 'Email me a link' }).waitFor();
+    await page.getByRole('button', { name: 'Email me a code' }).waitFor();
   }
   await wk.close();
 });

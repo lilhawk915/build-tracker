@@ -2,9 +2,9 @@
 import { canMoveBill, followUpWaiverKind, payBlockers, todayIso } from '../domain/rules';
 import type { Bill, ChangeOrder, Photo, Profile, TableName, Tables, Waiver } from '../domain/types';
 import { seed, type DB } from './seed';
-import type { Store } from './store';
+import { rowKey, type Store } from './store';
 
-const KEY = 'build-tracker-demo-v6';
+const KEY = 'build-tracker-demo-v7';
 const WHO = 'build-tracker-demo-who';
 const NUMBERED = new Set<TableName>(['pos', 'change_orders', 'draws']);
 const files = new Map<string, string>();
@@ -54,6 +54,7 @@ function visible<T extends TableName>(table: T, rows: Tables[T][]): Tables[T][] 
   }
   if (p.role === 'staff') {
     if (['vendor_contacts', 'auto_text_settings', 'auto_texts'].includes(table) && !p.can_view_contacts) return [];
+    if (['estimate_markups', 'estimate_versions', 'markup_defaults'].includes(table)) return [];
     if (table === 'profiles' && !p.can_view_contacts) return rows.filter((r) => (r as Profile).role !== 'sub');
     return rows;
   }
@@ -120,6 +121,7 @@ export const localStore: Store = {
   async me() { return me(); },
   onAuthChange(cb) { listener = cb; },
   async signIn() { return ''; },
+  async verifyCode() {},
   async signOut() {},
   async list(table) {
     return visible(table, load()[table] as never) as never;
@@ -144,6 +146,10 @@ export const localStore: Store = {
         }
       }
       if (table === 'pos') row.approved_co_cents = 0;
+      if (table === 'estimates') {
+        const d = db.markup_defaults[0];
+        db.estimate_markups.push({ estimate_id: row.id as string, sales_tax_pct: d.sales_tax_pct, contingency_pct: d.contingency_pct, overhead_pct: d.overhead_pct, profit_pct: d.profit_pct, profit_amount: null });
+      }
       if (table === 'tasks') row.contact_status ??= 'not_contacted';
       if (table === 'photos') {
         row.review_status = me().role === 'sub' ? 'pending' : 'approved';
@@ -164,7 +170,7 @@ export const localStore: Store = {
   },
   async update(table, id, patch) {
     const db = load();
-    const idKey = table === 'team_invites' ? 'email' : 'id';
+    const idKey = rowKey(table);
     const row = (db[table] as unknown as Record<string, unknown>[]).find((r) => r[idKey] === id);
     if (!row) throw new Error('That record no longer exists.');
     if (table === 'bills') {
@@ -189,7 +195,7 @@ export const localStore: Store = {
   },
   async remove(table, id) {
     const db = load();
-    const idKey = table === 'team_invites' ? 'email' : 'id';
+    const idKey = rowKey(table);
     const rows = db[table] as unknown as Record<string, unknown>[];
     const i = rows.findIndex((r) => r[idKey] === id);
     if (i < 0) return;

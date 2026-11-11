@@ -13,7 +13,7 @@ export type Data = { [K in keyof Tables]: Tables[K][] } & { subJobs: SubJob[]; m
 
 const EMPTY: Data = {
   vendors: [], profiles: [], team_invites: [], jobs: [], budget_lines: [], pos: [], bills: [], change_orders: [],
-  draws: [], draw_lines: [], lien_waivers: [], tasks: [], daily_logs: [], photos: [], selections: [], documents: [], job_steps: [], scope_items: [], materials: [], notifications: [], vendor_contacts: [], auto_text_settings: [], auto_texts: [], subJobs: [], myRequests: [],
+  draws: [], draw_lines: [], lien_waivers: [], tasks: [], daily_logs: [], photos: [], selections: [], documents: [], job_steps: [], scope_items: [], materials: [], notifications: [], vendor_contacts: [], auto_text_settings: [], auto_texts: [], estimates: [], estimate_markups: [], estimate_versions: [], catalog_items: [], company_settings: [], markup_defaults: [], expenses: [], subJobs: [], myRequests: [],
 };
 
 interface Ctx {
@@ -23,6 +23,7 @@ interface Ctx {
   loadError: string;
   reload: () => Promise<void>;
   run: (work: () => Promise<unknown>, done?: string) => Promise<boolean>;
+  say: (kind: 'ok' | 'err', text: string) => void;
   toast: { kind: 'ok' | 'err'; text: string } | null;
   clearToast: () => void;
 }
@@ -39,8 +40,9 @@ export function DataProvider({ me, children }: { me: Profile; children: ReactNod
     try {
       const staff = me.role === 'admin' || me.role === 'staff';
       const crew = me.role === 'crew';
+      const admin = me.role === 'admin';
       const contacts = canSeeContacts(me);
-      const [vendors, profiles, team_invites, jobs, budget_lines, pos, bills, change_orders, draws, draw_lines, lien_waivers, tasks, daily_logs, photos, selections, documents, job_steps, scope_items, materials, notifications, vendor_contacts, auto_text_settings, auto_texts, subJobs, myRequests] =
+      const [vendors, profiles, team_invites, jobs, budget_lines, pos, bills, change_orders, draws, draw_lines, lien_waivers, tasks, daily_logs, photos, selections, documents, job_steps, scope_items, materials, notifications, vendor_contacts, auto_text_settings, auto_texts, estimates, estimate_markups, estimate_versions, catalog_items, company_settings, markup_defaults, expenses, subJobs, myRequests] =
         await Promise.all([
           store.list('vendors'),
           store.list('profiles'),
@@ -65,10 +67,17 @@ export function DataProvider({ me, children }: { me: Profile; children: ReactNod
           contacts ? store.list('vendor_contacts') : Promise.resolve([]),
           contacts ? store.list('auto_text_settings') : Promise.resolve([]),
           contacts ? store.list('auto_texts') : Promise.resolve([]),
+          staff ? store.list('estimates') : Promise.resolve([]),
+          admin ? store.list('estimate_markups') : Promise.resolve([]),
+          admin ? store.list('estimate_versions') : Promise.resolve([]),
+          staff ? store.list('catalog_items') : Promise.resolve([]),
+          staff ? store.list('company_settings') : Promise.resolve([]),
+          admin ? store.list('markup_defaults') : Promise.resolve([]),
+          staff ? store.list('expenses') : Promise.resolve([]),
           staff ? Promise.resolve([]) : store.myJobs(),
           me.role === 'sub' ? store.myMaterialRequests() : Promise.resolve([]),
         ]);
-      setData({ vendors, profiles, team_invites, jobs, budget_lines, pos, bills, change_orders, draws, draw_lines, lien_waivers, tasks, daily_logs, photos, selections, documents, job_steps, scope_items, materials, notifications, vendor_contacts, auto_text_settings, auto_texts, subJobs, myRequests });
+      setData({ vendors, profiles, team_invites, jobs, budget_lines, pos, bills, change_orders, draws, draw_lines, lien_waivers, tasks, daily_logs, photos, selections, documents, job_steps, scope_items, materials, notifications, vendor_contacts, auto_text_settings, auto_texts, estimates, estimate_markups, estimate_versions, catalog_items, company_settings, markup_defaults, expenses, subJobs, myRequests });
       setLoadError('');
     } catch (e) {
       setLoadError((e as Error).message);
@@ -93,7 +102,7 @@ export function DataProvider({ me, children }: { me: Profile; children: ReactNod
   }, [reload]);
 
   const value = useMemo(
-    () => ({ me, data, loading, loadError, reload, run, toast, clearToast: () => setToast(null) }),
+    () => ({ me, data, loading, loadError, reload, run, toast, clearToast: () => setToast(null), say: (kind: 'ok' | 'err', text: string) => setToast({ kind, text }) }),
     [me, data, loading, loadError, reload, run, toast],
   );
   return <DataCtx.Provider value={value}>{children}</DataCtx.Provider>;

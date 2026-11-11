@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Material, MaterialRequest, Profile, SubJob, TableName } from '../domain/types';
-import type { Store } from './store';
+import { rowKey, type Store } from './store';
 
 const PAGE = 1000;
 
@@ -10,7 +10,7 @@ export function makeSupabaseStore(url: string, key: string): Store {
     if (r.error) throw new Error(r.error.message);
     return r.data;
   };
-  const keyOf = (table: TableName) => (table === 'team_invites' ? 'email' : 'id');
+  const keyOf = rowKey;
 
   return {
     mode: 'supabase',
@@ -34,7 +34,11 @@ export function makeSupabaseStore(url: string, key: string): Store {
         if (/signups? not allowed|otp_disabled/i.test(error.message)) throw new Error("This email hasn't been invited yet. Ask the owner to invite you.");
         throw new Error(error.message);
       }
-      return 'Check your email for the sign-in link.';
+      return 'Check your email for the sign-in code.';
+    },
+    async verifyCode(email, code) {
+      const { error } = await sb.auth.verifyOtp({ email, token: code.replace(/\D/g, ''), type: 'email' });
+      if (error) throw new Error(/expired|invalid/i.test(error.message) ? 'That code is wrong or has expired. Ask for a new one.' : error.message);
     },
     async signOut() {
       await sb.auth.signOut();

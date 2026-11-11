@@ -15,6 +15,17 @@ export type WaiverKind =
   | 'unconditional_final';
 
 import type { AutoTextSettings } from '../../supabase/functions/_shared/autotext';
+import type { CatalogRow, CompanyRow, EstimateRow, MarkupDefaultsRow, MarkupsRow } from '../estimator/convert';
+import type { CatalogItem as EstCatalogItem, Project as EstProject, Settings as EstSettings } from '../estimator/domain/types';
+
+export interface EstimateVersionRow {
+  id: string; estimate_id: string; label: string; created_at: string;
+  data: { project: EstProject; catalog: EstCatalogItem[]; settings: EstSettings };
+}
+export interface Expense {
+  id: string; job_id: string; budget_line_id: string | null; expense_date: string; vendor_name: string; description: string;
+  category: string; amount_cents: number; paid: boolean; file_path: string | null;
+}
 
 export type JobType = 'spec' | 'client' | 'flip' | 'remodel' | 'addition' | 'repair' | 'other';
 export const JOB_TYPES: { value: JobType; label: string }[] = [
@@ -123,6 +134,8 @@ export interface Tables {
   daily_logs: DailyLog; photos: Photo; selections: Selection; documents: Document; job_steps: JobStep;
   scope_items: ScopeItem; materials: Material; notifications: Notification; vendor_contacts: VendorContact;
   auto_text_settings: AutoTextSettings; auto_texts: AutoTextLog;
+  estimates: EstimateRow; estimate_markups: MarkupsRow; estimate_versions: EstimateVersionRow; catalog_items: CatalogRow;
+  company_settings: CompanyRow & { id: string }; markup_defaults: MarkupDefaultsRow & { id: string }; expenses: Expense;
 }
 export type TableName = keyof Tables;
 

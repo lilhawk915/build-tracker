@@ -5,6 +5,7 @@ export interface Store {
   me(): Promise<Profile | null>;
   onAuthChange(cb: () => void): void;
   signIn(email: string): Promise<string>;
+  verifyCode(email: string, code: string): Promise<void>;
   signOut(): Promise<void>;
   list<T extends TableName>(table: T): Promise<Tables[T][]>;
   insert<T extends TableName>(table: T, rows: Partial<Tables[T]> | Partial<Tables[T]>[]): Promise<void>;
@@ -26,5 +27,9 @@ export interface Store {
   demoSwitch?(who: string): void;
   demoReset?(): void;
 }
+
+// Most tables are keyed by id. These aren't.
+export const rowKey = (table: TableName): string =>
+  table === 'team_invites' ? 'email' : table === 'estimate_markups' ? 'estimate_id' : 'id';
 
 export const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);

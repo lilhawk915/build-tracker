@@ -707,6 +707,91 @@ describe('automatic text controls', () => {
   });
 });
 
+describe('estimates and expenses', () => {
+  const OFFICE2 = '00000000-0000-0000-0000-000000000014';
+  const CREW3 = '00000000-0000-0000-0000-000000000015';
+  let est: string;
+  beforeAll(async () => {
+    await db.exec(`
+      insert into public.team_invites (email, role) values ('office2@x.com','staff'), ('crew3@x.com','crew');
+      insert into auth.users (id, email) values ('${OFFICE2}','office2@x.com'), ('${CREW3}','crew3@x.com');
+      update public.profiles set can_view_contacts = true where id = '${OFFICE2}';
+      update public.markup_defaults set profit_pct = 12, overhead_pct = 8;
+    `);
+    const [e] = await as<{ id: string }>(STAFF, `insert into public.estimates (client_name, address, custom_lines, line_edits)
+      values ('100 Sample Rd - Concrete', '100 Sample Rd', '[{"key":"c.concrete","division":"Foundation","name":"Concrete","unit":"lump sum","qty":1,"catalogItemId":null}]', '{"c.concrete":{"materialUnit":3000,"laborUnit":0}}') returning id`);
+    est = e.id;
+  });
+  it('lets staff create and edit estimates and line items', async () => {
+    expect(await as(STAFF, `update public.estimates set notes = 'pour Friday' where id = $1 returning id`, [est])).toHaveLength(1);
+    const [row] = await as<{ custom_lines: unknown[]; line_edits: Record<string, unknown> }>(STAFF, 'select custom_lines, line_edits from public.estimates where id = $1', [est]);
+    expect(row.custom_lines).toHaveLength(1);
+    expect(row.line_edits).toEqual({ 'c.concrete': { materialUnit: 3000, laborUnit: 0 } });
+  });
+  it('gives every new estimate the default markups, visible to admins only', async () => {
+    const [m] = await as<{ profit_pct: string; overhead_pct: string }>(ADMIN, 'select profit_pct, overhead_pct from public.estimate_markups where estimate_id = $1', [est]);
+    expect(Number(m.profit_pct)).toBe(12);
+    expect(Number(m.overhead_pct)).toBe(8);
+  });
+  it('hides markups, profit, defaults, and saved versions from staff, even with contact access', async () => {
+    await as(ADMIN, `insert into public.estimate_versions (estimate_id, label, data) values ($1, 'Sent to client', '{"markups":{"profitAmount":4900}}')`, [est]);
+    for (const who of [STAFF, OFFICE2]) {
+      for (const t of ['estimate_markups', 'markup_defaults', 'estimate_versions']) {
+        expect(await as(who, `select * from public.${t}`), `${who} ${t}`).toHaveLength(0);
+      }
+      expect(await as(who, `update public.estimate_markups set profit_amount = 1 returning estimate_id`)).toHaveLength(0);
+      await expect(as(who, `insert into public.estimate_versions (estimate_id, data) values ($1, '{}')`, [est])).rejects.toThrow();
+    }
+  });
+  it('lets admins set a flat dollar profit and save versions', async () => {
+    const [m] = await as<{ profit_amount: string }>(ADMIN, `update public.estimate_markups set profit_amount = 4900 where estimate_id = $1 returning profit_amount`, [est]);
+    expect(Number(m.profit_amount)).toBe(4900);
+    expect((await as(ADMIN, 'select * from public.estimate_versions')).length).toBeGreaterThan(0);
+  });
+  it('keeps crew, subs, no-access logins, and visitors out of all of it', async () => {
+    for (const t of ['estimates', 'estimate_markups', 'estimate_versions', 'markup_defaults', 'catalog_items', 'company_settings', 'expenses']) {
+      for (const who of [CREW3, SUB_A, NOBODY]) expect(await as(who, `select * from public.${t}`), `${who} ${t}`).toHaveLength(0);
+      await expect(as(null, `select * from public.${t}`), t).rejects.toThrow();
+    }
+    await expect(as(CREW3, `insert into public.estimates (client_name) values ('x')`)).rejects.toThrow();
+    await expect(as(SUB_A, `insert into public.expenses (job_id, amount_cents) values ($1, 100)`, [JOB])).rejects.toThrow();
+  });
+  it('lets only admins delete an estimate, and its markups and versions go with it', async () => {
+    expect(await as(STAFF, 'delete from public.estimates where id = $1 returning id', [est])).toHaveLength(0);
+    const [tmp] = await as<{ id: string }>(STAFF, `insert into public.estimates (client_name) values ('Temp') returning id`);
+    await as(ADMIN, 'delete from public.estimates where id = $1', [tmp.id]);
+    const left = await root('select count(*)::int n from public.estimate_markups where estimate_id = $1', [tmp.id]);
+    expect((left.rows[0] as { n: number }).n).toBe(0);
+  });
+  it('lets staff read company details for quotes, but only admins change them', async () => {
+    expect(await as(STAFF, 'select name from public.company_settings')).toHaveLength(1);
+    expect(await as(STAFF, `update public.company_settings set name = 'x' returning id`)).toHaveLength(0);
+    expect(await as(ADMIN, `update public.company_settings set name = 'H3' returning id`)).toHaveLength(1);
+  });
+  it('keeps catalog prices exactly as typed, with no rounding', async () => {
+    const [c] = await as<{ unit_cost: string }>(STAFF, `insert into public.catalog_items (id, division, name, unit, unit_cost) values ('site.driveway','Site','Driveway','sqft', 2.875) returning unit_cost`);
+    expect(c.unit_cost).toBe('2.875');
+  });
+  it('records expenses in cents and keeps them on their own job', async () => {
+    const [x] = await as<{ amount_cents: string }>(STAFF, `insert into public.expenses (job_id, vendor_name, description, amount_cents) values ($1,'Home Depot','Rebar',12345) returning amount_cents`, [JOB]);
+    expect(Number(x.amount_cents)).toBe(12345);
+    await expect(as(STAFF, `insert into public.expenses (job_id, budget_line_id, amount_cents) values ($1,$2,100)`, [JOB, LINE2])).rejects.toThrow(/different job/);
+    await expect(as(STAFF, `insert into public.expenses (job_id, amount_cents) values ($1, 0)`, [JOB])).rejects.toThrow();
+  });
+  it('refuses to import the same Estimator record twice', async () => {
+    await as(STAFF, `insert into public.estimates (legacy_id, client_name) values ('stone-rd','A')`);
+    await expect(as(STAFF, `insert into public.estimates (legacy_id, client_name) values ('stone-rd','B')`)).rejects.toThrow();
+  });
+  it('links a won estimate to its job, and keeps the estimate if the job is deleted', async () => {
+    const j = await root(`insert into public.jobs (name) values ('From estimate') returning id`);
+    const jobId = (j.rows[0] as { id: string }).id;
+    await as(STAFF, `update public.estimates set status = 'won', job_id = $2 where id = $1`, [est, jobId]);
+    await as(ADMIN, 'delete from public.jobs where id = $1', [jobId]);
+    const [row] = await as<{ job_id: string | null; status: string }>(STAFF, 'select job_id, status from public.estimates where id = $1', [est]);
+    expect(row).toEqual({ job_id: null, status: 'won' });
+  });
+});
+
 describe('job types', () => {
   it('accepts every type and a note, and refuses unknown ones', async () => {
     for (const t of ['spec', 'client', 'flip', 'remodel', 'addition', 'repair', 'other']) {

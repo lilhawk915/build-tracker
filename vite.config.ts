@@ -5,5 +5,5 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig(({ mode }) => ({
   base: mode === 'pages' ? '/build-tracker/' : '/',
   plugins: [react()],
-  test: { include: ['tests/**/*.test.ts'], testTimeout: 30000 },
+  test: { include: ['tests/**/*.test.ts', 'src/estimator/**/*.test.ts'], testTimeout: 30000 },
 }));
