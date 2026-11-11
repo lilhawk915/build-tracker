@@ -54,9 +54,9 @@ export function Login() {
         {sent && (
           <form className="stack" onSubmit={check}>
             <label className="field">
-              Code from the email
-              <input inputMode="numeric" autoComplete="one-time-code" autoFocus required pattern="[0-9 ]{6,10}" value={code} onChange={(e) => setCode(e.target.value)} />
-              <span className="help">Or tap the link in the email on this device.</span>
+              Code or link from the email
+              <input autoComplete="one-time-code" autoCapitalize="off" autoCorrect="off" spellCheck={false} autoFocus required value={code} onChange={(e) => setCode(e.target.value)} />
+              <span className="help">On a computer, just click the link in the email. On a phone app, press and hold the link in the email, choose Copy, and paste it here.</span>
             </label>
             <button className="btn primary" disabled={busy}>Sign in</button>
           </form>

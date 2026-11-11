@@ -37,7 +37,12 @@ export function makeSupabaseStore(url: string, key: string): Store {
       return 'Check your email for the sign-in code.';
     },
     async verifyCode(email, code) {
-      const { error } = await sb.auth.verifyOtp({ email, token: code.replace(/\D/g, ''), type: 'email' });
+      // Free Supabase projects can't add the 6-digit code to the email, so a pasted sign-in link works here too.
+      const link = code.match(/[?&]token=([^&\s]+)/);
+      const type = (code.match(/[?&]type=([a-z_]+)/)?.[1] ?? 'magiclink') as 'magiclink' | 'invite' | 'signup' | 'email';
+      const { error } = link
+        ? await sb.auth.verifyOtp({ token_hash: decodeURIComponent(link[1]), type })
+        : await sb.auth.verifyOtp({ email, token: code.replace(/\D/g, ''), type: 'email' });
       if (error) throw new Error(/expired|invalid/i.test(error.message) ? 'That code is wrong or has expired. Ask for a new one.' : error.message);
     },
     async signOut() {

@@ -249,7 +249,7 @@ await step('code sign-in', staff, async () => {
   await new Promise((r) => setTimeout(r, 1500));
   const t = Date.now();
   await phone.getByRole('button', { name: 'Email me a code' }).click();
-  await phone.getByLabel('Code from the email').waitFor();
+  await phone.getByLabel('Code or link from the email').waitFor();
   let code = null;
   for (let i = 0; i < 40 && !code; i++) {
     const list = await (await fetch(`${MAIL}/api/v1/messages?limit=30`)).json();
@@ -262,14 +262,49 @@ await step('code sign-in', staff, async () => {
     if (!code) await new Promise((r) => setTimeout(r, 250));
   }
   check('The email carries a 6-digit code', Boolean(code));
-  await phone.getByLabel('Code from the email').fill('000000');
+  await phone.getByLabel('Code or link from the email').fill('000000');
   await phone.getByRole('button', { name: 'Sign in' }).click();
   await phone.locator('.alert', { hasText: 'wrong or has expired' }).waitFor();
   check('A wrong code is refused in plain words', true);
-  await phone.getByLabel('Code from the email').fill(code);
+  await phone.getByLabel('Code or link from the email').fill(code);
   await phone.getByRole('button', { name: 'Sign in' }).click();
   await phone.locator('.topbar').waitFor();
+  await phone.locator('main', { hasText: 'Today' }).waitFor().catch(() => {});
   check('Typing the code signs in on the phone, no link needed', (await phone.locator('main').innerText()).includes('Today'));
+  await ctx.close();
+});
+
+// The live (free) project can't put a code in the email, so the pasted link must sign in too.
+await step('pasted-link sign-in', staff, async () => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const phone = await ctx.newPage();
+  phone.setDefaultTimeout(12000);
+  await phone.goto(BASE);
+  await phone.getByLabel('Email').fill('eststaff@test.local');
+  await new Promise((r) => setTimeout(r, 1500));
+  const t = Date.now();
+  await phone.getByRole('button', { name: 'Email me a code' }).click();
+  await phone.getByLabel('Code or link from the email').waitFor();
+  let link = null;
+  for (let i = 0; i < 40 && !link; i++) {
+    const list = await (await fetch(`${MAIL}/api/v1/messages?limit=30`)).json();
+    const m = list.messages.find((x) => x.To.some((y) => y.Address === 'eststaff@test.local') && Date.parse(x.Created) >= t - 2000);
+    if (m) {
+      const full = await (await fetch(`${MAIL}/api/v1/message/${m.ID}`)).json();
+      link = (full.Text + full.HTML).match(/https?:\/\/[^\s"'<>]+verify[^\s"'<>]+/)?.[0]?.replace(/&amp;/g, '&') ?? null;
+    }
+    if (!link) await new Promise((r) => setTimeout(r, 250));
+  }
+  check('The email carries a sign-in link', Boolean(link));
+  await phone.getByLabel('Code or link from the email').fill(link.replace(/token=[^&]+/, 'token=nope'));
+  await phone.getByRole('button', { name: 'Sign in' }).click();
+  await phone.locator('.alert').waitFor();
+  check('A broken pasted link is refused', !(await phone.locator('.topbar').count()));
+  await phone.getByLabel('Code or link from the email').fill(link);
+  await phone.getByRole('button', { name: 'Sign in' }).click();
+  await phone.locator('.topbar').waitFor();
+  await phone.locator('main', { hasText: 'Today' }).waitFor().catch(() => {});
+  { const txt = await phone.locator('main').innerText(); check('Pasting the emailed link signs in on the phone', txt.includes('Today'), txt.slice(0, 200)); }
   await ctx.close();
 });
 
