@@ -21,7 +21,7 @@ export function seed(): DB {
   const db: DB = {
     vendors: [], profiles: [], team_invites: [], jobs: [], budget_lines: [], pos: [], bills: [], change_orders: [],
     draws: [], draw_lines: [], lien_waivers: [], tasks: [], daily_logs: [], photos: [], selections: [], documents: [], job_steps: [], scope_items: [], materials: [], notifications: [], vendor_contacts: [], auto_texts: [],
-    estimates: [], estimate_markups: [], estimate_versions: [], expenses: [],
+    estimates: [], estimate_markups: [], estimate_versions: [], expenses: [], invoices: [],
     catalog_items: seedCatalog().map(catalogToRow),
     company_settings: [{ id: 'main', name: 'Sample Builders', address: '', phone: '', email: '', license: '', logo_data_url: null, default_assumptions: defaultSettings().defaultAssumptions, default_validity_days: 30 }],
     markup_defaults: [{ id: 'main', sales_tax_pct: 0, contingency_pct: 0, overhead_pct: 0, profit_pct: 10 }],

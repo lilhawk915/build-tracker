@@ -54,7 +54,7 @@ function visible<T extends TableName>(table: T, rows: Tables[T][]): Tables[T][] 
   }
   if (p.role === 'staff') {
     if (['vendor_contacts', 'auto_text_settings', 'auto_texts'].includes(table) && !p.can_view_contacts) return [];
-    if (['estimate_markups', 'estimate_versions', 'markup_defaults'].includes(table)) return [];
+    if (['estimate_markups', 'estimate_versions', 'markup_defaults', 'invoices'].includes(table)) return [];
     if (table === 'profiles' && !p.can_view_contacts) return rows.filter((r) => (r as Profile).role !== 'sub');
     return rows;
   }
@@ -124,7 +124,7 @@ export const localStore: Store = {
   async verifyCode() {},
   async signOut() {},
   async list(table) {
-    return visible(table, load()[table] as never) as never;
+    return visible(table, (load()[table] ?? []) as never) as never; // older saved demos lack newer tables
   },
   async insert(table, rows) {
     const db = load();
@@ -146,6 +146,14 @@ export const localStore: Store = {
         }
       }
       if (table === 'pos') row.approved_co_cents = 0;
+      if (table === 'invoices') {
+        db.invoices ??= [];
+        row.number ??= Math.max(1000, ...db.invoices.map((i) => i.number)) + 1;
+        if (db.invoices.some((i) => i.number === row.number)) throw new Error(`Invoice ${row.number} already exists.`);
+        row.lines ??= []; row.paid_cents ??= 0; row.paid_date ??= null; row.terms ??= 'Due on receipt'; row.notes ??= '';
+        row.bill_to ??= ''; row.address ??= ''; row.job_id ??= null; row.estimate_id ??= null; row.due_date ??= null;
+        row.invoice_date ??= todayIso(); row.created_at ??= new Date().toISOString();
+      }
       if (table === 'estimates') {
         const d = db.markup_defaults[0];
         db.estimate_markups.push({ estimate_id: row.id as string, sales_tax_pct: d.sales_tax_pct, contingency_pct: d.contingency_pct, overhead_pct: d.overhead_pct, profit_pct: d.profit_pct, profit_amount: null });

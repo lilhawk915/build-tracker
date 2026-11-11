@@ -11,6 +11,7 @@ import { DrawsTab } from './tabs/DrawsTab';
 import { MaterialsTab } from './tabs/MaterialsTab';
 import { ScopeTab } from './tabs/ScopeTab';
 import { FilesTab } from './tabs/FilesTab';
+import { InvoicesTab } from './tabs/InvoicesTab';
 import { RecordTab } from './tabs/RecordTab';
 import { SelectionsTab } from './tabs/SelectionsTab';
 import { LogTab } from './tabs/LogTab';
@@ -54,7 +55,7 @@ export function JobPage() {
         </div>
       </div>
       <nav className="tabs" aria-label="Job sections">
-        {TABS.map(([k, label]) => (
+        {[...TABS, ...(me.role === 'admin' ? [['invoices', 'Invoices'] as const] : [])].map(([k, label]) => (
           <NavLink key={k} to={`/jobs/${job.id}/${k}`} className={tab === k ? 'active' : ''}>{label}</NavLink>
         ))}
       </nav>
@@ -64,6 +65,7 @@ export function JobPage() {
       {tab === 'record' && <RecordTab job={job} />}
       {tab === 'selections' && <SelectionsTab job={job} />}
       {tab === 'files' && <FilesTab job={job} />}
+      {tab === 'invoices' && me.role === 'admin' && <InvoicesTab job={job} />}
       {tab === 'budget' && <BudgetTab job={job} />}
       {tab === 'schedule' && <ScheduleTab job={job} />}
       {tab === 'pos' && <PosTab job={job} />}

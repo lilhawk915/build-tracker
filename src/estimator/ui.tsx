@@ -3,6 +3,7 @@ import { useData } from '../data';
 import { rowToCatalog, rowsToSettings } from './convert';
 import { defaultSettings } from './domain/house/defaults';
 import type { CatalogItem, Markups, Project, Settings } from './domain/types';
+import type { Invoice } from '../domain/types';
 
 export const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 export const qtyText = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -136,3 +137,25 @@ export function useSaveQueue() {
     return chain.current;
   };
 }
+
+/** Loads the PDF library only when someone makes an invoice PDF. */
+export function useInvoicePdf() {
+  const [busy, setBusy] = useState(false);
+  const { say } = useData();
+  const make = async (invoice: Invoice, company: Settings['company']): Promise<Blob | null> => {
+    setBusy(true);
+    try {
+      const { renderInvoicePdf } = await import('./InvoicePdf');
+      return await renderInvoicePdf(invoice, company);
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(msg)) say('err', 'Build Tracker was just updated. Reload this page, then make the PDF again.');
+      else say('err', `The PDF could not be made: ${msg}`);
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { make, busy };
+}
+export const invoiceFileName = (i: Invoice) => `Invoice_${i.number}_${safeName(i.bill_to || i.address || 'client')}.pdf`;

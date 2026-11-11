@@ -862,3 +862,36 @@ describe('deleting', () => {
     expect(await as(ADMIN, 'delete from public.jobs where id = $1 returning id', [JOB2])).toHaveLength(1);
   });
 });
+
+describe('invoices', () => {
+  it('numbers invoices from 1001 up and lets admins record payments', async () => {
+    const [a] = await as<{ id: string; number: number }>(ADMIN, `insert into public.invoices (job_id, bill_to, lines) values ($1, 'Sample client', '[{"description":"Concrete","detail":"","amount_cents":755000}]') returning id, number`, [JOB]);
+    const [b] = await as<{ number: number }>(ADMIN, `insert into public.invoices (bill_to) values ('Second') returning number`);
+    expect(a.number).toBe(1001);
+    expect(b.number).toBe(1002);
+    const [p] = await as<{ paid_cents: string }>(ADMIN, `update public.invoices set paid_cents = 755000, paid_date = current_date where id = $1 returning paid_cents`, [a.id]);
+    expect(Number(p.paid_cents)).toBe(755000);
+  });
+  it('refuses two invoices with the same number, a negative payment, and lines that are not a list', async () => {
+    await expect(as(ADMIN, `insert into public.invoices (number) values (1001)`)).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.invoices (paid_cents) values (-1)`)).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.invoices (lines) values ('{}')`)).rejects.toThrow();
+  });
+  it('keeps invoices from staff, subs, no-access logins, and visitors', async () => {
+    for (const who of [STAFF, SUB_A, NOBODY]) {
+      expect(await as(who, 'select * from public.invoices'), who).toHaveLength(0);
+      expect(await as(who, `update public.invoices set paid_cents = 0 returning id`), who).toHaveLength(0);
+      await expect(as(who, `insert into public.invoices (bill_to) values ('x')`), who).rejects.toThrow();
+    }
+    await expect(as(null, 'select * from public.invoices')).rejects.toThrow();
+  });
+  it('keeps the invoice when its job or estimate is deleted', async () => {
+    const [j] = await as<{ id: string }>(ADMIN, `insert into public.jobs (name) values ('Temp job') returning id`);
+    const [e] = await as<{ id: string }>(ADMIN, `insert into public.estimates (client_name) values ('Temp quote') returning id`);
+    const [i] = await as<{ id: string }>(ADMIN, `insert into public.invoices (job_id, estimate_id) values ($1, $2) returning id`, [j.id, e.id]);
+    await as(ADMIN, 'delete from public.estimates where id = $1', [e.id]);
+    await as(ADMIN, 'delete from public.jobs where id = $1', [j.id]);
+    const [left] = await as<{ job_id: string | null; estimate_id: string | null }>(ADMIN, 'select job_id, estimate_id from public.invoices where id = $1', [i.id]);
+    expect(left).toEqual({ job_id: null, estimate_id: null });
+  });
+});

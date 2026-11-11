@@ -128,6 +128,15 @@ export interface Notification {
 }
 export interface SubJob { id: string; name: string; address: string }
 
+/** One line on a customer invoice, in cents. */
+export interface InvoiceLine { description: string; detail: string; amount_cents: number }
+/** A customer invoice. Admins only: it carries client prices. */
+export interface Invoice {
+  id: string; number: number; job_id: string | null; estimate_id: string | null; bill_to: string; address: string;
+  invoice_date: string; due_date: string | null; terms: string; lines: InvoiceLine[]; paid_cents: number;
+  paid_date: string | null; notes: string; created_at: string;
+}
+
 export interface Tables {
   vendors: Vendor; profiles: Profile; team_invites: Invite; jobs: Job; budget_lines: BudgetLine; pos: Po; bills: Bill;
   change_orders: ChangeOrder; draws: Draw; draw_lines: DrawLine; lien_waivers: Waiver; tasks: Task;
@@ -136,6 +145,7 @@ export interface Tables {
   auto_text_settings: AutoTextSettings; auto_texts: AutoTextLog;
   estimates: EstimateRow; estimate_markups: MarkupsRow; estimate_versions: EstimateVersionRow; catalog_items: CatalogRow;
   company_settings: CompanyRow & { id: string }; markup_defaults: MarkupDefaultsRow & { id: string }; expenses: Expense;
+  invoices: Invoice;
 }
 export type TableName = keyof Tables;
 

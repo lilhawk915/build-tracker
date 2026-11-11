@@ -238,3 +238,13 @@ table.lines td:first-child { min-width: 260px; }
   th { background: none; }
   tfoot td { background: none; }
 }
+
+/* Quote → job → invoice progress */
+.steps { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; padding: 0; margin: 0 0 10px; counter-reset: step; }
+.steps li { counter-increment: step; color: var(--steel); }
+.steps li::before { content: counter(step) '. '; }
+.steps li.now { color: inherit; font-weight: 600; }
+.steps li.done { color: var(--pine); }
+ul.plain { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.topbar .undo { background: #2d3833; color: #fff; border-color: #55625c; min-height: 36px; }
+.topbar .undo:disabled { opacity: .45; cursor: default; }

@@ -329,6 +329,88 @@ await step('import', admin, async () => {
   check('App icon is served', (await fetch(`${BASE}/icon-192.png`)).headers.get('content-type')?.includes('image/png'));
 });
 
+await step('quote to invoice', admin, async () => {
+  const est = sql(`select id from public.estimates where legacy_id = 'sample-concrete';`);
+  const undoBtn = admin.locator('.topbar .undo');
+  await admin.goto(`${BASE}/estimates/${est}`);
+  await admin.locator('section[aria-label="Quote to invoice"]').waitFor();
+  await admin.getByRole('button', { name: 'Mark as sent' }).click();
+  await settle(admin);
+  check('Mark as sent sets the quote to Sent', sql(`select status from public.estimates where id = '${est}';`) === 'sent');
+  await admin.getByLabel('Status').selectOption('won');
+  await admin.getByRole('heading', { name: 'Job accepted' }).waitFor();
+  check('Choosing Won opens the Job accepted dialog', true);
+  await admin.getByLabel('New job name').fill('100 Sample Rd');
+  await admin.getByRole('button', { name: 'Accept and set up the job' }).click();
+  await admin.getByText('Accepted. Job:').waitFor();
+  const job = sql(`select id from public.jobs where name = '100 Sample Rd';`);
+  check('Accepting makes a job priced at the quote total', sql(`select sale_price_cents from public.jobs where id = '${job}';`) === '980000');
+  check('The quote is marked won and tied to the job', sql(`select status || ' ' || (job_id = '${job}') from public.estimates where id = '${est}';`) === 'won true');
+  await undoBtn.click();
+  await admin.getByText('Undone: Job accepted').waitFor();
+  check('Undo takes back the whole accept: job gone, quote back to Sent', sql(`select count(*) from public.jobs where name = '100 Sample Rd';`) === '0' && sql(`select status || ' ' || coalesce(job_id::text, 'none') from public.estimates where id = '${est}';`) === 'sent none');
+  await admin.getByRole('button', { name: 'Job accepted' }).click();
+  await admin.getByLabel('New job name').fill('100 Sample Rd');
+  await admin.getByRole('button', { name: 'Accept and set up the job' }).click();
+  await admin.getByText('Accepted. Job:').waitFor();
+  const job2 = sql(`select id from public.jobs where name = '100 Sample Rd';`);
+  await admin.getByRole('button', { name: 'Make invoice' }).click();
+  await admin.waitForURL(/\/invoices\/[0-9a-f-]{36}$/);
+  const invId = admin.url().split('/').pop();
+  await admin.getByRole('heading', { name: /Invoice 1001/ }).waitFor();
+  const lines = await admin.locator('section[aria-label="Invoice lines"]').innerText();
+  check('Invoice 1001 starts from the quote at $9,800', lines.includes('$9,800') , lines.replace(/\s+/g, ' ').slice(0, 200));
+  await typeIn(admin.getByLabel('Line 1 amount'), 9000);
+  await settle(admin);
+  check('Editing a line changes the invoice total', sql(`select (lines->0->>'amount_cents') from public.invoices where id = '${invId}';`) === '900000');
+  await undoBtn.click();
+  await admin.getByText(/Undone/).waitFor();
+  await settle(admin);
+  check('Undo puts the line amount back', sql(`select (lines->0->>'amount_cents') from public.invoices where id = '${invId}';`) === '980000' && (await admin.getByLabel('Line 1 amount').inputValue()).replace(/,/g, '').startsWith('9800'));
+  await admin.getByRole('button', { name: 'Mark paid in full' }).click();
+  await admin.getByText('marked paid in full').waitFor();
+  check('Mark paid in full records the payment', sql(`select paid_cents from public.invoices where id = '${invId}';`) === '980000' && (await admin.locator('h1').innerText()).includes('Paid'));
+  const [dl] = await Promise.all([admin.waitForEvent('download', { timeout: 30000 }), admin.getByRole('button', { name: 'Invoice PDF' }).click()]);
+  await dl.saveAs(`${out}/invoice.pdf`);
+  const bytes = readFileSync(`${out}/invoice.pdf`);
+  check('Invoice PDF downloads', bytes.subarray(0, 4).toString() === '%PDF' && bytes.length > 2000 && dl.suggestedFilename().startsWith('Invoice_1001'), dl.suggestedFilename());
+  for (let n = 0; n < 2; n++) {
+    await admin.getByRole('button', { name: 'Save PDF to job files' }).click();
+    await admin.getByText(/saved to 100 Sample Rd's files/).waitFor();
+    await settle(admin);
+  }
+  check('Saving the PDF to the job keeps one copy under Invoices', sql(`select count(*) from public.documents where job_id = '${job2}' and category = 'Invoices' and title = 'Invoice 1001';`) === '1');
+  await admin.screenshot({ path: `${out}/est-08-invoice.png`, fullPage: true });
+  await admin.goto(`${BASE}/jobs/${job2}/invoices`);
+  await admin.getByText('Contract price').waitFor();
+  const tab = await admin.locator('main').innerText();
+  check('The job shows contract, invoiced, paid and owed', tab.includes('Contract price') && tab.includes('$9,800') && tab.includes('Still owed') && tab.includes('1001'), tab.replace(/\s+/g, ' ').slice(0, 300));
+  await admin.goto(`${BASE}/invoices`);
+  await admin.getByRole('heading', { name: 'Invoices' }).waitFor();
+  check('Paid invoices drop off the "Not paid yet" list', (await admin.locator('main').innerText()).includes('Nothing is waiting to be paid'));
+  // Undo on the estimate page itself.
+  await admin.goto(`${BASE}/estimates/${est}`);
+  const name = admin.getByLabel('Client name');
+  await name.fill('Wrong name'); await name.press('Tab');
+  await settle(admin);
+  check('Typing a new client name saves it', sql(`select client_name from public.estimates where id = '${est}';`) === 'Wrong name');
+  await undoBtn.click();
+  await admin.getByText(/Undone/).waitFor();
+  await settle(admin);
+  check('Undo puts the client name back, in the database and on screen', sql(`select client_name from public.estimates where id = '${est}';`) === '100 Sample Rd - Concrete' && (await name.inputValue()) === '100 Sample Rd - Concrete');
+});
+
+await step('invoices are admin only', staff, async () => {
+  await staff.goto(`${BASE}/estimates`);
+  await staff.locator('.topbar').waitFor();
+  check('Staff have no Invoices link', !(await staff.locator('.topbar nav').innerText()).includes('Invoices'));
+  await staff.goto(`${BASE}/invoices`);
+  await staff.getByText('Invoices are for admins').waitFor().catch(() => {});
+  check('Staff are turned away from the invoices page', (await staff.locator('main').innerText()).includes('Invoices are for admins'));
+  const r = await rest(staff, 'invoices?select=*');
+  check('Staff read no invoices from the database directly', Array.isArray(r.json) && r.json.length === 0, JSON.stringify(r.json).slice(0, 100));
+});
+
 await step('phone', admin, async () => {
   await admin.setViewportSize({ width: 390, height: 844 });
   await admin.goto(`${BASE}/estimates/${estId}`);

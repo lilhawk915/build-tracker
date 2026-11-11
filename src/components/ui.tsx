@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { store, useData } from '../data';
+import { store, useData, useUndoNext } from '../data';
 import { centsToDecimal, money, parseMoney } from '../domain/csv';
 import type { LineRollup } from '../domain/budget';
 import { scheduleHealth } from '../domain/jobops';
@@ -227,7 +227,8 @@ export function FileLink({ path, label = 'View file' }: { path: string; label?: 
 }
 
 export function Toast() {
-  const { toast, clearToast } = useData();
+  const { toast, clearToast, undo } = useData();
+  const next = useUndoNext();
   useEffect(() => {
     if (toast?.kind !== 'ok') return;
     const t = setTimeout(clearToast, 3500);
@@ -237,6 +238,7 @@ export function Toast() {
   return (
     <div className={`toast${toast.kind === 'err' ? ' err' : ''}`} role={toast.kind === 'err' ? 'alert' : 'status'}>
       <span>{toast.text}</span>
+      {toast.kind === 'ok' && next && !toast.text.startsWith('Undone') && <button className="linkish" onClick={() => { clearToast(); void undo(); }}>Undo</button>}
       <button className="linkish" onClick={clearToast}>Dismiss</button>
     </div>
   );
@@ -249,4 +251,17 @@ export function downloadCsv(name: string, csv: string) {
   a.download = name;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Top-bar Undo: reverses the last change, one step per press. */
+export function UndoButton() {
+  const { undo } = useData();
+  const next = useUndoNext();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button className="btn tiny undo" disabled={!next || busy} title={next ? `Undo: ${next}` : 'Nothing to undo'}
+      onClick={async () => { setBusy(true); try { await undo(); } finally { setBusy(false); } }}>
+      ↶ Undo
+    </button>
+  );
 }

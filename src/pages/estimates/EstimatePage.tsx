@@ -10,6 +10,7 @@ import type { Markups, Project } from '../../estimator/domain/types';
 import { COST_ONLY, NumberCell, TextBlock, TextCell, downloadFile, qtyText, safeName, useEstimating, useQuotePdf, useSaveQueue, usd } from '../../estimator/ui';
 import { HouseInputs } from './HouseInputs';
 import { LineTable } from './LineTable';
+import { QuoteToInvoice } from './QuoteToInvoice';
 
 const STATUS = [['draft', 'Draft'], ['sent', 'Sent to client'], ['won', 'Won'], ['lost', 'Lost']] as const;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -51,7 +52,7 @@ function MarkupsBox({ project, priced, update }: { project: Project; priced: Ret
 
 export function EstimatePage() {
   const { estimateId } = useParams();
-  const { data, me, run, say, reload } = useData();
+  const { data, me, run, say, reload, undoTick } = useData();
   const nav = useNavigate();
   const { catalog, settings, isAdmin } = useEstimating();
   const row = data.estimates.find((e) => e.id === estimateId);
@@ -63,18 +64,22 @@ export function EstimatePage() {
   const queue = useSaveQueue();
   const pdf = useQuotePdf();
   const [status, setStatus] = useState(row?.status ?? 'draft');
+  const [acceptNow, setAcceptNow] = useState(false);
 
   // Load once per estimate. After that the page works on its own copy and saves each change.
   const loadedFor = useRef<string | null>(null);
+  const tickSeen = useRef(undoTick);
   useEffect(() => {
-    if (row && loadedFor.current !== row.id) {
+    // After an undo the saved estimate changed underneath this page, so take a fresh copy.
+    if (row && (loadedFor.current !== row.id || tickSeen.current !== undoTick)) {
+      tickSeen.current = undoTick;
       const p = rowsToProject(row, markupsRow);
       current.current = p;
       setProject(p);
       setStatus(row.status);
       loadedFor.current = row.id;
     }
-  }, [row, markupsRow]);
+  }, [row, markupsRow, undoTick]);
   // Leaving the page refreshes the lists, so totals there are current.
   useEffect(() => () => { void queue(async () => { await reload(); }); }, []);
 
@@ -151,6 +156,7 @@ export function EstimatePage() {
           <span>Status</span>
           <select aria-label="Status" value={status} onChange={(e) => {
             const s = e.target.value as typeof status;
+            if (s === 'won' && isAdmin && !row.job_id) { setAcceptNow(true); return; }
             setStatus(s);
             void run(() => store.update('estimates', row.id, { status: s }), 'Status saved.');
           }}>
@@ -164,6 +170,7 @@ export function EstimatePage() {
           <div><dt>Valid through</dt><dd>{through}</dd></div>
         </dl>
       </div>
+      {isAdmin && <QuoteToInvoice row={row} project={project} priced={priced} onStatus={setStatus} acceptNow={acceptNow} onAcceptShown={() => setAcceptNow(false)} />}
       {priced.unverifiedCount > 0 && <div className="alert warn">{priced.unverifiedCount} line{priced.unverifiedCount === 1 ? '' : 's'} still use placeholder prices from the catalog. The PDF is stamped DRAFT until they are real.</div>}
       {!isAdmin && <div className="alert calm">You see costs only. Profit, markups, and the client price are for admins.</div>}
 
