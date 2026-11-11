@@ -11,7 +11,8 @@
     "demo": "vite --mode demo --port 5184",
     "local:start": "colima start --cpu 4 --memory 6 --disk 40; supabase stop; supabase start",
     "local:stop": "supabase stop && colima stop",
-    "build:pages": "tsc -b && vite build --mode pages && cp dist/index.html dist/404.html && touch dist/.nojekyll"
+    "build:pages": "tsc -b && vite build --mode pages && cp dist/index.html dist/404.html && touch dist/.nojekyll",
+    "publish": "sh scripts/publish-pages.sh"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",

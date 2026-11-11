@@ -117,7 +117,10 @@ export function useQuotePdf() {
       const name = [safeName(project.clientName || project.address), versionLabel ? safeName(versionLabel) : null, mode === 'internal' ? 'INTERNAL' : 'quote'].filter(Boolean).join('_');
       downloadFile(`${name}.pdf`, blob);
     } catch (e) {
-      say('err', `The PDF could not be made: ${(e as Error).message}`);
+      const msg = (e as Error).message;
+      // An open page can outlive a site update; the fresh page has the PDF maker.
+      if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(msg)) say('err', 'Build Tracker was just updated. Reload this page, then make the PDF again.');
+      else say('err', `The PDF could not be made: ${msg}`);
     } finally {
       setBusy(false);
     }
