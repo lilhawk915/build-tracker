@@ -5,7 +5,7 @@ import { safeFileName } from '../../data/store';
 import type { Document, Job } from '../../domain/types';
 
 export const FILE_CATEGORIES = [
-  'Drawings', 'Engineering', 'Permits and inspections', 'Contracts', 'Estimates and bids', 'Warranties and manuals',
+  'Drawings', 'Engineering', 'Permits and inspections', 'Contracts', 'Estimates and bids', 'Invoices', 'Warranties and manuals',
   'Closing documents', 'Other',
 ];
 const MAX_BYTES = 50 * 1024 * 1024;
