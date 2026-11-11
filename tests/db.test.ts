@@ -885,6 +885,19 @@ describe('invoices', () => {
     }
     await expect(as(null, 'select * from public.invoices')).rejects.toThrow();
   });
+  it('numbers quotes, keeps the deposit between 0 and 100%, and marks deposit and final invoices', async () => {
+    const [a] = await as<{ number: number; deposit_pct: string }>(STAFF, `insert into public.estimates (client_name) values ('Quote A') returning number, deposit_pct`);
+    const [b] = await as<{ number: number }>(ADMIN, `insert into public.estimates (client_name, deposit_pct) values ('Quote B', 50) returning number`);
+    expect(b.number).toBe(a.number + 1);
+    expect(Number(a.deposit_pct)).toBe(0);
+    await expect(as(ADMIN, `insert into public.estimates (client_name, number) values ('Dup', $1)`, [a.number])).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.estimates (client_name, deposit_pct) values ('Bad', 101)`)).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.estimates (client_name, deposit_pct) values ('Bad', -1)`)).rejects.toThrow();
+    const [d] = await as<{ kind: string }>(ADMIN, `insert into public.invoices (kind) values ('deposit') returning kind`);
+    const [plain] = await as<{ kind: string }>(ADMIN, `insert into public.invoices (bill_to) values ('x') returning kind`);
+    expect([d.kind, plain.kind]).toEqual(['deposit', 'standard']);
+    await expect(as(ADMIN, `insert into public.invoices (kind) values ('other')`)).rejects.toThrow();
+  });
   it('keeps the invoice when its job or estimate is deleted', async () => {
     const [j] = await as<{ id: string }>(ADMIN, `insert into public.jobs (name) values ('Temp job') returning id`);
     const [e] = await as<{ id: string }>(ADMIN, `insert into public.estimates (client_name) values ('Temp quote') returning id`);

@@ -4,6 +4,9 @@ import { Empty, FileLink, Status } from '../components/ui';
 import { useData } from '../data';
 import { highlightParts, jobYear, KIND_LABEL, search, type JobHit, type SearchKind } from '../domain/search';
 import { JOB_TYPES, jobTypeLabel } from '../domain/types';
+import { money } from '../domain/csv';
+import { useEstimating } from '../estimator/ui';
+import { jobMoney, type JobMoney } from './jobMoney';
 
 const COLLAPSED = 6;
 
@@ -15,7 +18,7 @@ function Marked({ text, query }: { text: string; query: string }) {
   );
 }
 
-function Hit({ hit, query }: { hit: JobHit; query: string }) {
+function Hit({ hit, query, cash }: { hit: JobHit; query: string; cash?: JobMoney }) {
   const [all, setAll] = useState(false);
   const { job, records } = hit;
   const shown = all ? records : records.slice(0, COLLAPSED);
@@ -27,6 +30,17 @@ function Hit({ hit, query }: { hit: JobHit; query: string }) {
           <Link to={`/jobs/${job.id}/record`}><h2><Marked text={job.name} query={query} /></h2></Link>
           <span className="muted small"><Marked text={facts} query={query} /></span>
         </div>
+        {cash && (
+          <dl className="jobcash" aria-label={`${job.name} amount and profit`}>
+            <div><dt>Amount</dt><dd>{money(cash.amount)}</dd></div>
+            <div>
+              <dt>Projected profit</dt>
+              <dd className={cash.profit !== null && cash.profit < 0 ? 'bad' : ''} title={cash.basis === 'budget' ? 'Amount minus the forecast cost in the job budget' : cash.basis === 'quote' ? "From the accepted quote's profit, plus change orders" : 'Add a budget or accept a quote onto this job to see profit'}>
+                {cash.profit === null ? '—' : money(cash.profit)}
+              </dd>
+            </div>
+          </dl>
+        )}
         <Status s={job.status} />
       </header>
       {shown.map((r) => (
@@ -50,6 +64,7 @@ function Hit({ hit, query }: { hit: JobHit; query: string }) {
 
 export function SearchPage() {
   const { data } = useData();
+  const { catalog, settings, isAdmin } = useEstimating();
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const kind = (params.get('kind') ?? '') as SearchKind | '';
@@ -64,6 +79,9 @@ export function SearchPage() {
   };
 
   const hits = useMemo(() => search(data, q, { kind, year, vendorId, jobType }), [data, q, kind, year, vendorId, jobType]);
+  // Price and profit are for admins only, like the rest of the money.
+  const cash = useMemo(() => (isAdmin ? new Map(data.jobs.map((j) => [j.id, jobMoney(j, data, catalog, settings)])) : null), [isAdmin, data, catalog, settings]);
+  const shownCash = cash ? hits.map((h) => cash.get(h.job.id)!).filter(Boolean) : [];
   const years = [...new Set(data.jobs.map(jobYear).filter(Boolean))].sort().reverse();
   const vendors = [...data.vendors].sort((a, b) => a.name.localeCompare(b.name));
   const filtered = Boolean(q.trim() || kind || year || vendorId || jobType);
@@ -114,6 +132,11 @@ export function SearchPage() {
         {hits.length} of {data.jobs.length} job{data.jobs.length === 1 ? '' : 's'}.
         {' '}Search reads file names and titles, not the text inside a drawing.
       </p>
+      {cash && shownCash.length > 1 && (
+        <p className="small" aria-label="Totals for the jobs shown">
+          <b>These jobs:</b> {money(shownCash.reduce((s, c) => s + c.amount, 0))} in work, {money(shownCash.reduce((s, c) => s + (c.profit ?? 0), 0))} projected profit.
+        </p>
+      )}
       {hits.length === 0 ? (
         <Empty>
           {data.jobs.length === 0 ? 'Add your first job from the Today page.' : (
@@ -123,7 +146,7 @@ export function SearchPage() {
             </>
           )}
         </Empty>
-      ) : hits.map((h) => <Hit key={h.job.id} hit={h} query={q} />)}
+      ) : hits.map((h) => <Hit key={h.job.id} hit={h} query={q} cash={cash?.get(h.job.id)} />)}
     </div>
   );
 }

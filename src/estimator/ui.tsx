@@ -142,11 +142,11 @@ export function useSaveQueue() {
 export function useInvoicePdf() {
   const [busy, setBusy] = useState(false);
   const { say } = useData();
-  const make = async (invoice: Invoice, company: Settings['company']): Promise<Blob | null> => {
+  const make = async (invoice: Invoice, company: Settings['company'], quoteNumber?: number): Promise<Blob | null> => {
     setBusy(true);
     try {
       const { renderInvoicePdf } = await import('./InvoicePdf');
-      return await renderInvoicePdf(invoice, company);
+      return await renderInvoicePdf(invoice, company, quoteNumber);
     } catch (e) {
       const msg = (e as Error).message;
       if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(msg)) say('err', 'Build Tracker was just updated. Reload this page, then make the PDF again.');
@@ -159,3 +159,23 @@ export function useInvoicePdf() {
   return { make, busy };
 }
 export const invoiceFileName = (i: Invoice) => `Invoice_${i.number}_${safeName(i.bill_to || i.address || 'client')}.pdf`;
+
+/** Loads the PDF library only when someone downloads a change order. */
+export function useChangeOrderPdf() {
+  const [busy, setBusy] = useState(false);
+  const { say } = useData();
+  const download = async (co: import('./ChangeOrderPdf').ChangeOrderSheet, company: Settings['company']) => {
+    setBusy(true);
+    try {
+      const { renderChangeOrderPdf } = await import('./ChangeOrderPdf');
+      downloadFile(`Change_order_${co.number}_${safeName(co.job_name)}.pdf`, await renderChangeOrderPdf(co, company));
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(msg)) say('err', 'Build Tracker was just updated. Reload this page, then make the PDF again.');
+      else say('err', `The PDF could not be made: ${msg}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { download, busy };
+}

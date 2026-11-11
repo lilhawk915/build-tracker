@@ -357,7 +357,7 @@ await step('quote to invoice', admin, async () => {
   await admin.getByRole('button', { name: 'Make invoice' }).click();
   await admin.waitForURL(/\/invoices\/[0-9a-f-]{36}$/);
   const invId = admin.url().split('/').pop();
-  await admin.getByRole('heading', { name: /Invoice 1001/ }).waitFor();
+  await admin.getByRole('heading', { name: /invoice 1001/i }).waitFor();
   const lines = await admin.locator('section[aria-label="Invoice lines"]').innerText();
   check('Invoice 1001 starts from the quote at $9,800', lines.includes('$9,800') , lines.replace(/\s+/g, ' ').slice(0, 200));
   await typeIn(admin.getByLabel('Line 1 amount'), 9000);
@@ -400,6 +400,87 @@ await step('quote to invoice', admin, async () => {
   check('Undo puts the client name back, in the database and on screen', sql(`select client_name from public.estimates where id = '${est}';`) === '100 Sample Rd - Concrete' && (await name.inputValue()) === '100 Sample Rd - Concrete');
 });
 
+await step('deposit, change order and final invoice', admin, async () => {
+  // A $17,760 drywall quote: $6,000 material + $8,800 labor + $2,960 flat profit, 50% up front.
+  const lines = JSON.stringify([
+    { key: 'd.mat', division: 'Insulation/Drywall', name: 'Drywall board, 220 sheets, with mud, tape and corner bead', unit: 'lump sum', qty: 1, catalogItemId: null },
+    { key: 'd.lab', division: 'Insulation/Drywall', name: 'Hang, tape and finish, Level 4', unit: 'lump sum', qty: 1, catalogItemId: null },
+  ]);
+  const edits = JSON.stringify({ 'd.mat': { materialUnit: 6000, laborUnit: 0 }, 'd.lab': { materialUnit: 0, laborUnit: 8800 } });
+  const est = sql(`insert into public.estimates (kind, client_name, address, custom_lines, line_edits, deposit_pct, validity_days) values ('custom', 'Drywall test', '100 Sample Rd', '${lines}', '${edits}', 50, 30) returning id;`).split('\n')[0];
+  sql(`update public.estimate_markups set sales_tax_pct = 0, contingency_pct = 0, overhead_pct = 0, profit_pct = 0, profit_amount = 2960 where estimate_id = '${est}';`);
+  const qn = sql(`select number from public.estimates where id = '${est}';`);
+  await admin.goto(`${BASE}/estimates/${est}`);
+  await admin.locator('section[aria-label="Quote to invoice"]').waitFor();
+  const head = await admin.locator('main').innerText();
+  check('The quote shows its number and the deposit due at signing', head.includes(`Quote #${qn}`) && head.includes('$8,880.00 due at signing') && head.includes('$17,760'), head.replace(/\s+/g, ' ').slice(0, 300));
+  const [q] = await Promise.all([admin.waitForEvent('download', { timeout: 30000 }), admin.getByRole('button', { name: 'Client quote PDF' }).click()]);
+  await q.saveAs(`${out}/drywall-quote.pdf`);
+  check('The client quote PDF downloads', readFileSync(`${out}/drywall-quote.pdf`).subarray(0, 4).toString() === '%PDF');
+  await admin.getByRole('button', { name: 'Job accepted' }).click();
+  await admin.getByLabel('New job name').fill('100 Sample Rd - Drywall');
+  await admin.getByRole('button', { name: 'Accept and set up the job' }).click();
+  await admin.getByText('Accepted. Job:').waitFor();
+  const job = sql(`select id from public.jobs where name = '100 Sample Rd - Drywall';`);
+  check('Accepting sets up the job budget from the quote costs', sql(`select string_agg(name || '=' || budget_cents, ',' order by sort) from public.budget_lines where job_id = '${job}';`) === 'Insulation/Drywall - material=600000,Insulation/Drywall - labor=880000');
+  check('The panel says to send the deposit invoice before ordering', (await admin.locator('section[aria-label="Quote to invoice"]').innerText()).includes("Don't order material"));
+  await admin.getByRole('button', { name: /Make deposit invoice \(50%: \$8,880\)/ }).click();
+  await admin.waitForURL(/\/invoices\/[0-9a-f-]{36}$/);
+  const dep = admin.url().split('/').pop();
+  await admin.getByRole('heading', { name: /Deposit invoice/ }).waitFor();
+  check('The deposit invoice is $8,880 and points at the quote', sql(`select kind || ' ' || (lines->0->>'amount_cents') || ' ' || (lines->0->>'description') from public.invoices where id = '${dep}';`) === `deposit 888000 Deposit (50%) - Quote #${qn}`);
+  const [dd] = await Promise.all([admin.waitForEvent('download', { timeout: 30000 }), admin.getByRole('button', { name: 'Invoice PDF' }).click()]);
+  check('The deposit invoice PDF downloads', dd.suggestedFilename().endsWith('.pdf'));
+  await admin.goto(`${BASE}/estimates/${est}`);
+  await admin.getByText('The deposit is not paid yet').waitFor();
+  check('An unpaid deposit warns not to order or schedule', true);
+  await admin.goto(`${BASE}/invoices/${dep}`);
+  await admin.getByRole('button', { name: 'Mark paid in full' }).click();
+  await admin.getByText('marked paid in full').waitFor();
+  // A change order, signed mid-job.
+  await admin.goto(`${BASE}/jobs/${job}/changes`);
+  await admin.getByRole('button', { name: 'Add a change order' }).click();
+  await admin.getByLabel('What changed').fill('Extra 10 sheets in the garage');
+  await admin.getByLabel('Budget line').selectOption({ label: 'Insulation/Drywall - labor' });
+  await admin.getByLabel('Change to your cost').fill('400');
+  await admin.getByLabel('Change to client price').fill('800');
+  await admin.getByRole('button', { name: 'Add change order' }).click();
+  await admin.getByText('Change order saved').waitFor();
+  const coRow = admin.locator('tr', { hasText: 'Extra 10 sheets' });
+  const [cp] = await Promise.all([admin.waitForEvent('download', { timeout: 30000 }), coRow.getByRole('button', { name: 'PDF' }).click()]);
+  await cp.saveAs(`${out}/change-order.pdf`);
+  check('The change order PDF downloads', readFileSync(`${out}/change-order.pdf`).subarray(0, 4).toString() === '%PDF' && cp.suggestedFilename().startsWith('Change_order_1'), cp.suggestedFilename());
+  await coRow.getByRole('button', { name: 'Approve' }).click();
+  await admin.getByText(/approved/).first().waitFor();
+  await settle(admin);
+  // Final invoice: quote + change order - deposit.
+  await admin.goto(`${BASE}/estimates/${est}`);
+  await admin.getByText('Deposit received').waitFor();
+  await admin.getByRole('button', { name: 'Make final invoice' }).click();
+  await admin.waitForURL(/\/invoices\/[0-9a-f-]{36}$/);
+  const fin = admin.url().split('/').pop();
+  await admin.getByRole('heading', { name: /Final invoice/ }).waitFor();
+  check('The final invoice is quote + change order - deposit = $9,680', sql(`select kind || ' ' || (select sum((l->>'amount_cents')::bigint) from jsonb_array_elements(lines) l) from public.invoices where id = '${fin}';`) === 'final 968000');
+  const finText = await admin.locator('section[aria-label="Invoice lines"]').innerText();
+  const descs = sql(`select string_agg(l->>'description', ' | ') from public.invoices, jsonb_array_elements(lines) l where id = '${fin}';`);
+  check('The final invoice lists the quote, the change order and the deposit credit', descs === `Drywall test - Quote #${qn} | Change order #1 | Less deposit received (Invoice #${sql(`select number from public.invoices where id = '${dep}';`)})` && finText.includes('$9,680'), descs);
+  await admin.goto(`${BASE}/estimates/${est}`);
+  await admin.locator('section[aria-label="Quote to invoice"]').waitFor();
+  check('A billed change order is not offered again', !(await admin.locator('section[aria-label="Quote to invoice"]').innerText()).includes('Bill 1 new change order'));
+  await admin.screenshot({ path: `${out}/est-09-deposit-final.png`, fullPage: true });
+  // All jobs: amount and projected profit.
+  await admin.goto(`${BASE}/search?q=Drywall`);
+  const card = admin.locator('dl[aria-label="100 Sample Rd - Drywall amount and profit"]');
+  await card.waitFor();
+  const cash = await card.innerText();
+  check('All jobs shows the amount with the change order and the projected profit', cash.includes('$18,560') && cash.includes('$3,360'), cash.replace(/\s+/g, ' '));
+  await admin.goto(`${BASE}/search`);
+  await admin.locator('dl[aria-label="100 Sample Rd amount and profit"]').waitFor();
+  const quoteOnly = await admin.locator('dl[aria-label="100 Sample Rd amount and profit"]').innerText();
+  check('Every job on All jobs shows a projected profit', /Projected profit\s*\$[\d,]+/.test(quoteOnly), quoteOnly.replace(/\s+/g, ' '));
+  await admin.screenshot({ path: `${out}/est-10-all-jobs.png`, fullPage: true });
+});
+
 await step('invoices are admin only', staff, async () => {
   await staff.goto(`${BASE}/estimates`);
   await staff.locator('.topbar').waitFor();
@@ -409,6 +490,10 @@ await step('invoices are admin only', staff, async () => {
   check('Staff are turned away from the invoices page', (await staff.locator('main').innerText()).includes('Invoices are for admins'));
   const r = await rest(staff, 'invoices?select=*');
   check('Staff read no invoices from the database directly', Array.isArray(r.json) && r.json.length === 0, JSON.stringify(r.json).slice(0, 100));
+  await staff.goto(`${BASE}/search`);
+  await staff.getByRole('heading', { name: 'All jobs' }).waitFor();
+  await staff.waitForTimeout(500);
+  check('Staff do not see job amounts or projected profit on All jobs', !(await staff.locator('main').innerText()).includes('Projected profit'));
 });
 
 await step('phone', admin, async () => {

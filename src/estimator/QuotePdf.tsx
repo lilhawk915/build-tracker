@@ -9,6 +9,7 @@ export type QuoteMode = 'client' | 'internal';
 (globalThis as unknown as { Buffer: typeof Buffer }).Buffer ??= Buffer;
 
 const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+const pct = (n: number) => `${Math.round(n * 100) / 100}%`;
 const qty = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
 const s = StyleSheet.create({
@@ -51,6 +52,8 @@ function QuoteDocument({ mode, project, catalog, settings, versionLabel }: Quote
   const { lines, totals, divisions, unverifiedCount, markups: m } = priceProject(project, catalog, settings);
   const c = settings.company;
   const through = validUntil(project.date, project.validityDays);
+  const depositPct = project.depositPct ?? 0;
+  const deposit = Math.round(totals.grandTotal * depositPct) / 100;
   const contact = [c.address, c.phone, c.email, c.license ? `License: ${c.license}` : ''].filter(Boolean);
 
   return (
@@ -76,6 +79,7 @@ function QuoteDocument({ mode, project, catalog, settings, versionLabel }: Quote
           </View>
           <View>
             <Text style={s.title}>{mode === 'internal' ? 'Internal Estimate' : 'Quote'}</Text>
+            {project.quoteNumber ? <Text style={[s.meta, s.bold]}>Quote #{project.quoteNumber}</Text> : null}
             {project.date && <Text style={s.meta}>Date: {project.date}</Text>}
             {through && <Text style={s.meta}>Valid through: {through}</Text>}
             {versionLabel && <Text style={s.meta}>Version: {versionLabel}</Text>}
@@ -224,12 +228,24 @@ function QuoteDocument({ mode, project, catalog, settings, versionLabel }: Quote
           </View>
         )}
 
+        {mode === 'client' && depositPct > 0 && (
+          <View wrap={false}>
+            <Text style={s.sectionTitle}>Payment terms</Text>
+            <Text>
+              {pct(depositPct)} deposit ({usd(deposit)}) is due when this quote is signed. Material is ordered and the work is scheduled once the deposit is received.
+            </Text>
+            <Text>The balance ({usd(totals.grandTotal - deposit)}) is due on completion.</Text>
+          </View>
+        )}
+
         {mode === 'client' && (
         <View wrap={false}>
           <Text style={s.sectionTitle}>Acceptance</Text>
           <Text>
-            By signing below, the client accepts this quote{through ? `, which is valid through ${through}` : ''}.
+            By signing below, the client accepts this quote and its terms. The signed quote is the agreement for this work.
           </Text>
+          {through ? <Text>This quote is good through {through}, because material prices change.</Text> : null}
+          <Text>Any change to this scope needs a signed change order, with its price, before that work is done.</Text>
           <View style={s.sigRow}>
             <View style={s.sigBlock}>
               <View style={s.sigLine} />

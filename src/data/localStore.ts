@@ -152,13 +152,16 @@ export const localStore: Store = {
         if (db.invoices.some((i) => i.number === row.number)) throw new Error(`Invoice ${row.number} already exists.`);
         row.lines ??= []; row.paid_cents ??= 0; row.paid_date ??= null; row.terms ??= 'Due on receipt'; row.notes ??= '';
         row.bill_to ??= ''; row.address ??= ''; row.job_id ??= null; row.estimate_id ??= null; row.due_date ??= null;
-        row.invoice_date ??= todayIso(); row.created_at ??= new Date().toISOString();
+        row.invoice_date ??= todayIso(); row.created_at ??= new Date().toISOString(); row.kind ??= 'standard';
       }
       if (table === 'estimates') {
+        row.number ??= Math.max(1000, ...db.estimates.map((e) => e.number ?? 0)) + 1;
+        row.deposit_pct ??= 0;
         const d = db.markup_defaults[0];
         db.estimate_markups.push({ estimate_id: row.id as string, sales_tax_pct: d.sales_tax_pct, contingency_pct: d.contingency_pct, overhead_pct: d.overhead_pct, profit_pct: d.profit_pct, profit_amount: null });
       }
       if (table === 'tasks') row.contact_status ??= 'not_contacted';
+      if (table === 'budget_lines') { row.code ??= ''; row.bought_out ??= false; row.budget_cents ??= 0; row.sort ??= 0; }
       if (table === 'photos') {
         row.review_status = me().role === 'sub' ? 'pending' : 'approved';
         row.review_note = '';

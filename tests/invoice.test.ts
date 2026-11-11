@@ -23,3 +23,32 @@ describe('invoice math', () => {
     expect(l.reduce((s, x) => s + x.amount_cents, 0)).toBe(300034);
   });
 });
+
+import { depositLines, finalLines, unbilledChangeOrders } from '../src/domain/invoice';
+
+describe('deposit and final invoices', () => {
+  it('bills a 50% deposit on a $17,760 quote as $8,880, pointing at the quote', () => {
+    const [l] = depositLines('Drywall', 1003, 1776000, 50);
+    expect(l.amount_cents).toBe(888000);
+    expect(l.description).toBe('Deposit (50%) - Quote #1003');
+    expect(l.detail).toContain('balance of $8,880.00 is due on completion');
+  });
+  it('rounds an odd deposit to the cent', () => {
+    expect(depositLines('x', 1, 100001, 33.33)[0].amount_cents).toBe(33330);
+  });
+  it('final = quote + approved unbilled change orders - deposits received', () => {
+    const cos = [
+      { id: 'a', number: 1, description: 'Extra 10 sheets', price_delta_cents: 80000, status: 'approved' },
+      { id: 'b', number: 2, description: 'Ceiling', price_delta_cents: 150000, status: 'pending' },
+      { id: 'c', number: 3, description: 'Texture', price_delta_cents: 30000, status: 'approved' },
+      { id: 'd', number: 4, description: 'Cost only', price_delta_cents: 0, status: 'approved' },
+    ];
+    const already = [{ lines: [{ description: 'x', detail: '', amount_cents: 30000, change_order_id: 'c' }] }];
+    const open = unbilledChangeOrders(cos, already);
+    expect(open.map((c) => c.id)).toEqual(['a']);
+    const lines = finalLines([{ description: 'Drywall', detail: '220 sheets', amount_cents: 1776000 }], 1003, open, [{ number: 1004, paid_cents: 888000 }, { number: 1005, paid_cents: 0 }]);
+    expect(lines.map((l) => l.description)).toEqual(['Drywall - Quote #1003', 'Change order #1', 'Less deposit received (Invoice #1004)']);
+    expect(lines.reduce((s, l) => s + l.amount_cents, 0)).toBe(1776000 + 80000 - 888000);
+    expect(lines[1].change_order_id).toBe('a');
+  });
+});

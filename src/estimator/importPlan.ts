@@ -14,7 +14,7 @@ export interface ImportPlanItem {
   versions: number;
   skipped: boolean;          // already imported before
   recordEntries: number;     // bills, materials and notes in the Estimator's Job Record tab (not imported here)
-  estimate: EstimateRow;
+  estimate: Omit<EstimateRow, 'number'>;
   markups: MarkupsRow;
   versionRows: { estimate_id: string; label: string; data: { project: Project; catalog: CatalogItem[]; settings: Settings }; created_at: string }[];
 }

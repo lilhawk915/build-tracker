@@ -5,6 +5,7 @@ import { useData } from '../../data';
 import { money } from '../../domain/csv';
 import { invoiceBalance, invoiceStatus, invoiceTotal } from '../../domain/invoice';
 import type { Invoice } from '../../domain/types';
+import { KIND_WORD } from '../estimates/QuoteToInvoice';
 
 export const statusChip = (i: Invoice) => {
   const st = invoiceStatus(i);
@@ -22,7 +23,7 @@ export function InvoiceTable({ rows, showJob = true }: { rows: Invoice[]; showJo
           {rows.map((i) => (
             <tr key={i.id}>
               <td className="num"><Link to={`/invoices/${i.id}`}>{i.number}</Link></td>
-              <td><Link to={`/invoices/${i.id}`}>{i.bill_to || i.address || 'No name yet'}</Link></td>
+              <td><Link to={`/invoices/${i.id}`}>{i.bill_to || i.address || 'No name yet'}</Link>{KIND_WORD[i.kind ?? 'standard'] && <> <span className="chip">{KIND_WORD[i.kind ?? 'standard']}</span></>}</td>
               {showJob && <td>{i.job_id && jobName(i.job_id) ? <Link to={`/jobs/${i.job_id}/invoices`}>{jobName(i.job_id)}</Link> : <span className="muted">No job</span>}</td>}
               <td className="num">{i.invoice_date}</td>
               <td className="right num">{money(invoiceTotal(i))}</td>

@@ -29,3 +29,45 @@ export function linesFromQuote(title: string, divisions: QuoteDivision[], lines:
   if (drift && out.length) out[out.length - 1].amount_cents += drift;
   return out;
 }
+
+const usd = (cents: number) => (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+export const quoteRef = (n: number | undefined | null) => (n ? `Quote #${n}` : 'the quote');
+export const pctText = (p: number) => `${Math.round(p * 100) / 100}%`;
+
+/** The deposit due up front: pct of the quote total, rounded to the cent. */
+export const depositCents = (totalCents: number, pct: number) => Math.round((totalCents * pct) / 100);
+
+/** One line: the deposit, pointing back to the quote it belongs to. */
+export function depositLines(title: string, quoteNumber: number | undefined, totalCents: number, pct: number): InvoiceLine[] {
+  const amount = depositCents(totalCents, pct);
+  return [{
+    description: `Deposit (${pctText(pct)}) - ${quoteRef(quoteNumber)}`,
+    detail: `${title}. Quote total ${usd(totalCents)}. Deposit is due before material is ordered and the work is scheduled. The balance of ${usd(totalCents - amount)} is due on completion.`,
+    amount_cents: amount,
+  }];
+}
+
+interface CoLike { id: string; number: number; description: string; price_delta_cents: number | string; status: string }
+interface DepositLike { number: number; paid_cents: number | string }
+
+/** Approved change orders with a client price that no invoice has billed yet. */
+export function unbilledChangeOrders<T extends CoLike>(cos: T[], invoices: Pick<Invoice, 'lines'>[]): T[] {
+  const billed = new Set(invoices.flatMap((i) => i.lines.map((l) => l.change_order_id).filter(Boolean)));
+  return cos.filter((c) => c.status === 'approved' && Number(c.price_delta_cents) !== 0 && !billed.has(c.id)).sort((a, b) => a.number - b.number);
+}
+
+export const changeOrderLines = (cos: CoLike[]): InvoiceLine[] => cos.map((c) => ({
+  description: `Change order #${c.number}`, detail: c.description, amount_cents: Number(c.price_delta_cents), change_order_id: c.id,
+}));
+
+/**
+ * The final invoice: the quote at its full price, each unbilled approved change order, then each
+ * deposit as a credit for what was actually received. The total of the lines is the balance due.
+ */
+export function finalLines(quoteLines: InvoiceLine[], quoteNumber: number | undefined, cos: CoLike[], deposits: DepositLike[]): InvoiceLine[] {
+  const quote = quoteLines.map((l, n) => (n === 0 && quoteNumber ? { ...l, description: `${l.description} - ${quoteRef(quoteNumber)}` } : l));
+  const credits = deposits.filter((d) => Number(d.paid_cents) > 0).map((d): InvoiceLine => ({
+    description: `Less deposit received (Invoice #${d.number})`, detail: '', amount_cents: -Number(d.paid_cents),
+  }));
+  return [...quote, ...changeOrderLines(cos), ...credits];
+}

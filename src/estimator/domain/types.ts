@@ -216,6 +216,10 @@ export interface Project {
   customLines: CustomLine[];
   assumptions: string;
   validityDays: number;
+  /** Percent of the price due up front, before material is ordered. 0 or missing = none. */
+  depositPct?: number;
+  /** The quote's number, set by the database. Missing on quotes from the old Estimator. */
+  quoteNumber?: number;
   createdAt: string;
   updatedAt: string;
 }

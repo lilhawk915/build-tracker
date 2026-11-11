@@ -18,6 +18,9 @@ export interface EstimateRow {
   custom_lines: Project['customLines'];
   assumptions: string;
   validity_days: number;
+  /** Set by the database on insert. */
+  number: number;
+  deposit_pct: number | string;
   job_id: string | null;
   created_at: string;
   updated_at: string;
@@ -45,7 +48,7 @@ export interface MarkupDefaultsRow { sales_tax_pct: Num; contingency_pct: Num; o
 
 const n = (v: Num) => Number(v);
 
-export function projectToRows(p: Project, id: string, settings: Settings): { estimate: EstimateRow; markups: MarkupsRow } {
+export function projectToRows(p: Project, id: string, settings: Settings): { estimate: Omit<EstimateRow, 'number'>; markups: MarkupsRow } {
   const m = p.markups ?? {
     salesTaxPct: settings.salesTaxPct, contingencyPct: settings.contingencyPct,
     overheadPct: settings.overheadPct, profitPct: settings.profitPct, profitAmount: null,
@@ -54,7 +57,7 @@ export function projectToRows(p: Project, id: string, settings: Settings): { est
     estimate: {
       id, legacy_id: p.id, kind: p.kind, status: 'draft', client_name: p.clientName, address: p.address,
       quote_date: p.date, notes: p.notes, inputs: p.inputs, line_edits: p.lineEdits, custom_lines: p.customLines,
-      assumptions: p.assumptions, validity_days: p.validityDays, job_id: null, created_at: p.createdAt, updated_at: p.updatedAt,
+      assumptions: p.assumptions, validity_days: p.validityDays, deposit_pct: p.depositPct ?? 0, job_id: null, created_at: p.createdAt, updated_at: p.updatedAt,
     },
     markups: {
       estimate_id: id, sales_tax_pct: m.salesTaxPct, contingency_pct: m.contingencyPct, overhead_pct: m.overheadPct,
@@ -71,12 +74,13 @@ export function rowsToMarkups(m: MarkupsRow): Markups {
 }
 
 // Staff never get the markups row, so `markups` may be missing. Callers must not show a client price then.
-export function rowsToProject(e: EstimateRow, markups: MarkupsRow | null): Project {
+export function rowsToProject(e: EstimateRow | Omit<EstimateRow, 'number'>, markups: MarkupsRow | null): Project {
   return {
     id: e.id, kind: e.kind, record: emptyRecord(), markups: markups ? rowsToMarkups(markups) : undefined,
     clientName: e.client_name, address: e.address, date: e.quote_date, notes: e.notes,
     inputs: { ...defaultInputs(), ...e.inputs }, lineEdits: e.line_edits ?? {}, customLines: e.custom_lines ?? [],
-    assumptions: e.assumptions, validityDays: e.validity_days, createdAt: e.created_at, updatedAt: e.updated_at,
+    assumptions: e.assumptions, validityDays: e.validity_days,
+    depositPct: Number(e.deposit_pct ?? 0) || 0, quoteNumber: 'number' in e ? e.number : undefined, createdAt: e.created_at, updatedAt: e.updated_at,
   };
 }
 

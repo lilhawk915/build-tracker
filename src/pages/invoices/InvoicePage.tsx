@@ -7,6 +7,7 @@ import type { Invoice, InvoiceLine } from '../../domain/types';
 import { safeFileName } from '../../data/store';
 import { NumberCell, TextBlock, TextCell, downloadFile, invoiceFileName, useEstimating, useInvoicePdf } from '../../estimator/ui';
 import { statusChip } from './InvoicesPage';
+import { KIND_WORD } from '../estimates/QuoteToInvoice';
 
 const TERMS = ['Due on receipt', 'Net 7', 'Net 15', 'Net 30'];
 
@@ -29,13 +30,13 @@ export function InvoicePage() {
   const company = settings.company;
 
   const download = async () => {
-    const blob = await pdf.make(inv, company);
+    const blob = await pdf.make(inv, company, quote?.number);
     if (blob) downloadFile(invoiceFileName(inv), blob);
   };
   // Keeps one copy per invoice in the job's files: saving again replaces the old copy.
   const saveToJob = async () => {
     if (!job) return;
-    const blob = await pdf.make(inv, company);
+    const blob = await pdf.make(inv, company, quote?.number);
     if (!blob) return;
     const title = `Invoice ${inv.number}`;
     const name = invoiceFileName(inv);
@@ -61,7 +62,7 @@ export function InvoicePage() {
       </div>
 
       <div className="panel estimatehead">
-        <h1 style={{ margin: 0 }}>Invoice {inv.number} {statusChip(inv)}</h1>
+        <h1 style={{ margin: 0 }}>{KIND_WORD[inv.kind ?? 'standard'] ? `${KIND_WORD[inv.kind ?? 'standard']} invoice` : 'Invoice'} {inv.number} {statusChip(inv)}</h1>
         <div className="inrow"><span>Bill to</span><TextCell className="field" label="Bill to" value={inv.bill_to} onCommit={(v) => set({ bill_to: v })} /></div>
         <div className="inrow"><span>Property address</span><TextCell className="field" label="Property address" value={inv.address} onCommit={(v) => set({ address: v })} /></div>
         <div className="inrow"><span>Invoice date</span><TextCell className="field" type="date" label="Invoice date" value={inv.invoice_date} onCommit={(v) => v && set({ invoice_date: v })} /></div>
@@ -88,7 +89,7 @@ export function InvoicePage() {
             {job && <Link to={`/jobs/${job.id}/invoices`}>Open job</Link>}
           </span>
         </div>
-        {quote && <div className="inrow"><span>From quote</span><Link to={`/estimates/${quote.id}`}>{quote.client_name || quote.address}</Link></div>}
+        {quote && <div className="inrow"><span>From quote</span><Link to={`/estimates/${quote.id}`}>{quote.number ? `Quote #${quote.number}: ` : ''}{quote.client_name || quote.address}</Link></div>}
       </div>
 
       <section className="panel" aria-label="Invoice lines">

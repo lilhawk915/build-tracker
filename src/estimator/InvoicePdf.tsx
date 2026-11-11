@@ -15,7 +15,7 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1.5, borderBottomColor: '#1e293b', paddingBottom: 12, marginBottom: 16 },
   logo: { maxWidth: 130, maxHeight: 60, marginBottom: 4, objectFit: 'contain', objectPositionX: 0 },
   company: { fontFamily: 'Helvetica-Bold', fontSize: 13 },
-  title: { fontFamily: 'Helvetica-Bold', fontSize: 24, letterSpacing: 2, textAlign: 'right' },
+  title: { fontFamily: 'Helvetica-Bold', fontSize: 20, letterSpacing: 2, textAlign: 'right' },
   metaRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 2 },
   metaLabel: { width: 70, color: '#475569' },
   metaValue: { width: 110 },
@@ -34,12 +34,12 @@ const s = StyleSheet.create({
   foot: { marginTop: 30, color: '#475569', fontSize: 9.5 },
 });
 
-function InvoiceDocument({ invoice: i, company: c }: { invoice: Invoice; company: CompanyInfo }) {
+function InvoiceDocument({ invoice: i, company: c, quoteNumber }: { invoice: Invoice; company: CompanyInfo; quoteNumber?: number }) {
   const total = invoiceTotal(i);
   const paid = Number(i.paid_cents);
   const balance = invoiceBalance(i);
   const contact = [c.address, c.phone, c.email, c.license ? `License: ${c.license}` : ''].filter(Boolean);
-  const meta: [string, string][] = [['Invoice #', String(i.number)], ['Date', longDate(i.invoice_date)], ['Terms', i.terms], ...(i.due_date ? [['Due', longDate(i.due_date)] as [string, string]] : [])];
+  const meta: [string, string][] = [['Invoice #', String(i.number)], ['Date', longDate(i.invoice_date)], ...(quoteNumber ? [['Quote #', String(quoteNumber)] as [string, string]] : []), ['Terms', i.terms], ...(i.due_date ? [['Due', longDate(i.due_date)] as [string, string]] : [])];
   return (
     <Document title={`Invoice ${i.number} - ${i.bill_to || i.address}`} author={c.name}>
       <Page size="LETTER" style={s.page}>
@@ -50,7 +50,7 @@ function InvoiceDocument({ invoice: i, company: c }: { invoice: Invoice; company
             {contact.map((line) => <Text key={line}>{line}</Text>)}
           </View>
           <View>
-            <Text style={s.title}>INVOICE</Text>
+            <Text style={s.title}>{i.kind === 'deposit' ? 'DEPOSIT INVOICE' : i.kind === 'final' ? 'FINAL INVOICE' : 'INVOICE'}</Text>
             {meta.map(([k, v]) => (
               <View key={k} style={s.metaRow}><Text style={s.metaLabel}>{k}</Text><Text style={[s.metaValue, k === 'Invoice #' ? s.bold : {}]}>{v}</Text></View>
             ))}
@@ -82,6 +82,6 @@ function InvoiceDocument({ invoice: i, company: c }: { invoice: Invoice; company
   );
 }
 
-export async function renderInvoicePdf(invoice: Invoice, company: CompanyInfo): Promise<Blob> {
-  return pdf(<InvoiceDocument invoice={invoice} company={company} />).toBlob();
+export async function renderInvoicePdf(invoice: Invoice, company: CompanyInfo, quoteNumber?: number): Promise<Blob> {
+  return pdf(<InvoiceDocument invoice={invoice} company={company} quoteNumber={quoteNumber} />).toBlob();
 }

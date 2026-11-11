@@ -88,7 +88,7 @@ export function EstimatePage() {
 
   const save = (prev: Project, next: Project) => queue(async () => {
     const patch: Record<string, unknown> = {};
-    const fields: [keyof Project, string][] = [['clientName', 'client_name'], ['address', 'address'], ['date', 'quote_date'], ['notes', 'notes'], ['inputs', 'inputs'], ['lineEdits', 'line_edits'], ['customLines', 'custom_lines'], ['assumptions', 'assumptions'], ['validityDays', 'validity_days']];
+    const fields: [keyof Project, string][] = [['clientName', 'client_name'], ['address', 'address'], ['date', 'quote_date'], ['notes', 'notes'], ['inputs', 'inputs'], ['lineEdits', 'line_edits'], ['customLines', 'custom_lines'], ['assumptions', 'assumptions'], ['validityDays', 'validity_days'], ['depositPct', 'deposit_pct']];
     for (const [k, col] of fields) if (!same(prev[k], next[k])) patch[col] = next[k];
     try {
       if (Object.keys(patch).length) await store.update('estimates', next.id, patch as never);
@@ -125,8 +125,8 @@ export function EstimatePage() {
       await queue(async () => {});
       await store.insert('estimate_versions', { estimate_id: row.id, label: `Auto-saved before restoring "${v.label}"`, data: { project: prev, catalog, settings } });
       const r = v.data.project;
-      const next: Project = { ...prev, kind: r.kind, clientName: r.clientName, address: r.address, date: r.date, notes: r.notes, inputs: r.inputs, lineEdits: r.lineEdits, customLines: r.customLines, assumptions: r.assumptions, validityDays: r.validityDays, markups: r.markups ?? prev.markups };
-      await store.update('estimates', row.id, { client_name: next.clientName, address: next.address, quote_date: next.date, notes: next.notes, inputs: next.inputs, line_edits: next.lineEdits, custom_lines: next.customLines, assumptions: next.assumptions, validity_days: next.validityDays } as never);
+      const next: Project = { ...prev, kind: r.kind, clientName: r.clientName, address: r.address, date: r.date, notes: r.notes, inputs: r.inputs, lineEdits: r.lineEdits, customLines: r.customLines, assumptions: r.assumptions, validityDays: r.validityDays, depositPct: r.depositPct ?? prev.depositPct, markups: r.markups ?? prev.markups };
+      await store.update('estimates', row.id, { client_name: next.clientName, address: next.address, quote_date: next.date, notes: next.notes, inputs: next.inputs, line_edits: next.lineEdits, custom_lines: next.customLines, assumptions: next.assumptions, validity_days: next.validityDays, deposit_pct: next.depositPct ?? 0 } as never);
       if (next.markups) {
         const m = next.markups;
         await store.update('estimate_markups', row.id, { sales_tax_pct: m.salesTaxPct, contingency_pct: m.contingencyPct, overhead_pct: m.overheadPct, profit_pct: m.profitPct, profit_amount: m.profitAmount });
@@ -148,10 +148,18 @@ export function EstimatePage() {
         </div>
       </div>
       <div className="panel estimatehead">
+        {project.quoteNumber ? <h1 style={{ margin: 0 }}>Quote #{project.quoteNumber}</h1> : null}
         <div className="inrow"><span>Client</span><TextCell className="field" label="Client name" value={project.clientName} onCommit={(v) => update((p) => ({ ...p, clientName: v }))} /></div>
         <div className="inrow"><span>Property address</span><TextCell className="field" label="Property address" value={project.address} onCommit={(v) => update((p) => ({ ...p, address: v }))} /></div>
         <div className="inrow"><span>Quote date</span><TextCell className="field" type="date" label="Quote date" value={project.date} onCommit={(v) => v && update((p) => ({ ...p, date: v }))} /></div>
         <div className="inrow"><span>Valid for (days)</span><NumberCell className="field num" label="Valid for days" value={project.validityDays} min={1} onCommit={(v) => v && update((p) => ({ ...p, validityDays: Math.round(v) }))} /></div>
+        <div className="inrow">
+          <span>Deposit up front (%)</span>
+          <span className="row nowrap">
+            <NumberCell className="field num short" label="Deposit percent" value={project.depositPct ?? 0} min={0} onCommit={(v) => update((p) => ({ ...p, depositPct: Math.min(100, Math.max(0, v ?? 0)) }))} />
+            {isAdmin && (project.depositPct ?? 0) > 0 && <span className="muted small">{usd(Math.round(priced.totals.grandTotal * (project.depositPct ?? 0)) / 100)} due at signing, the rest on completion</span>}
+          </span>
+        </div>
         <div className="inrow">
           <span>Status</span>
           <select aria-label="Status" value={status} onChange={(e) => {

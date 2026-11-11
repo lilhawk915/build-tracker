@@ -129,12 +129,18 @@ export interface Notification {
 export interface SubJob { id: string; name: string; address: string }
 
 /** One line on a customer invoice, in cents. */
-export interface InvoiceLine { description: string; detail: string; amount_cents: number }
+export interface InvoiceLine {
+  description: string; detail: string; amount_cents: number;
+  /** Set on a line that bills an approved change order, so it is never billed twice. */
+  change_order_id?: string;
+}
+/** deposit: the up-front part of a quote. final: quote + change orders - deposits. standard: anything else. */
+export type InvoiceKind = 'standard' | 'deposit' | 'final';
 /** A customer invoice. Admins only: it carries client prices. */
 export interface Invoice {
   id: string; number: number; job_id: string | null; estimate_id: string | null; bill_to: string; address: string;
   invoice_date: string; due_date: string | null; terms: string; lines: InvoiceLine[]; paid_cents: number;
-  paid_date: string | null; notes: string; created_at: string;
+  paid_date: string | null; notes: string; created_at: string; kind: InvoiceKind;
 }
 
 export interface Tables {
