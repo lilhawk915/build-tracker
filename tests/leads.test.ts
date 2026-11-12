@@ -117,3 +117,20 @@ describe('making it easy', () => {
     expect(list[1].what).toBe('Meet Pat Sample at 1:30 PM, 100 Sample Rd');
   });
 });
+
+describe('Google Calendar link', () => {
+  it('fills in the meeting at Ohio time, with the place', async () => {
+    const { googleCalendarUrl } = await import('../src/domain/leads');
+    const u = new URL(googleCalendarUrl(lead({ phone: '937-555-0100' }), appt()));
+    expect(u.hostname).toBe('calendar.google.com');
+    expect(u.searchParams.get('dates')).toBe('20261115T133000/20261115T143000');
+    expect(u.searchParams.get('ctz')).toBe('America/New_York');
+    expect(u.searchParams.get('text')).toBe('Meet Sample Client');
+    expect(u.searchParams.get('location')).toBe('100 Sample Rd');
+    expect(u.searchParams.get('details')).toContain('Phone: 937-555-0100');
+  });
+  it('makes an all-day event when there is no time', async () => {
+    const { googleCalendarUrl } = await import('../src/domain/leads');
+    expect(new URL(googleCalendarUrl(lead(), appt({ appt_time: null, appt_date: '2026-11-30' }))).searchParams.get('dates')).toBe('20261130/20261201');
+  });
+});

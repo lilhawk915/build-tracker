@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { FormModal, money } from '../../components/ui';
 import { store, useData } from '../../data';
-import { LEAD_KINDS, LEAD_STAGES, QUICK_LOGS, addDays, appointmentIcs, appointmentText, dateText, followUp, formatPhone, kindLabel, leadValue, stageLabel } from '../../domain/leads';
+import { LEAD_KINDS, LEAD_STAGES, QUICK_LOGS, addDays, appointmentIcs, appointmentText, dateText, followUp, formatPhone, googleCalendarUrl, kindLabel, leadValue, stageLabel } from '../../domain/leads';
 import { todayIso } from '../../domain/rules';
 import { starterBudget, starterSchedule } from '../../domain/templates';
 import { JOB_TYPES, isNewHouse, type JobType, type Lead, type LeadAppointment, type LeadKind } from '../../domain/types';
@@ -143,6 +143,7 @@ export function LeadPage() {
                   {a.notes && <span className="muted small"> · {a.notes}</span>}
                 </span>
                 <span className="row">
+                  <a className="btn tiny" href={googleCalendarUrl(lead, a)} target="_blank" rel="noreferrer">Add to Google Calendar</a>
                   <button className="btn tiny" onClick={() => calendar(a)}>Add to calendar</button>
                   <button className="btn tiny danger" aria-label={`Remove appointment on ${appointmentText(a)}`} onClick={() => {
                     if (window.confirm('Remove this meeting?')) void run(() => store.remove('lead_appointments', a.id), 'Meeting removed.');
@@ -233,7 +234,7 @@ export function LeadPage() {
             const ok = await run(async () => {
               await store.insert('lead_appointments', { lead_id: lead.id, appt_date: v.appt_date as string, appt_time: (v.appt_time as string) || null, place: String(v.place ?? '').trim(), who: String(v.who ?? '').trim(), notes: String(v.notes ?? '').trim() });
               if (lead.stage === 'new') await store.update('leads', lead.id, { stage: 'appointment' });
-            }, 'Meeting added. Tap "Add to calendar" to put it on your phone.');
+            }, 'Meeting added. Tap "Add to Google Calendar" to save it and invite your team.');
             if (ok) setAdding(false);
           }}
         />

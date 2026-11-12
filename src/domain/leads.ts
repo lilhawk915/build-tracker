@@ -168,3 +168,25 @@ export function agenda(leads: Lead[], appts: LeadAppointment[], today: string): 
   const rank = { late: 0, today: 1, soon: 2, week: 2 };
   return items.sort((a, b) => rank[a.due] - rank[b.due] || a.date.localeCompare(b.date));
 }
+
+/**
+ * A link that opens Google Calendar with the meeting filled in. You tap Save, and can invite people from there.
+ * Times are Ohio time. No time means an all-day event.
+ */
+export function googleCalendarUrl(lead: Pick<Lead, 'name' | 'phone' | 'address'>, a: LeadAppointment): string {
+  const day = a.appt_date.replace(/-/g, '');
+  let dates: string;
+  if (a.appt_time) {
+    const [h, m] = a.appt_time.split(':').map(Number);
+    const t = (mins: number) => `${String(Math.floor(mins / 60) % 24).padStart(2, '0')}${String(mins % 60).padStart(2, '0')}00`;
+    const end = h * 60 + m + 60;
+    dates = `${day}T${t(h * 60 + m)}/${day}T${end >= 24 * 60 ? '235900' : t(end)}`;
+  } else {
+    dates = `${day}/${addDays(a.appt_date, 1).replace(/-/g, '')}`;
+  }
+  const details = [lead.phone && `Phone: ${lead.phone}`, a.who && `Going: ${a.who}`, a.notes].filter(Boolean).join('\n');
+  const q = new URLSearchParams({ action: 'TEMPLATE', text: `Meet ${lead.name || 'lead'}`, dates, ctz: 'America/New_York' });
+  if (a.place || lead.address) q.set('location', a.place || lead.address);
+  if (details) q.set('details', details);
+  return `https://calendar.google.com/calendar/render?${q.toString()}`;
+}

@@ -524,6 +524,8 @@ await step('leads', admin, async () => {
   const [dl] = await Promise.all([admin.waitForEvent('download'), admin.getByRole('button', { name: 'Add to calendar' }).click()]);
   const ics = readFileSync(await dl.path(), 'utf8');
   check('Add to calendar gives a 1:30 PM calendar file with the place', ics.includes('DTSTART:20261115T133000') && ics.includes('LOCATION:100 Sample Rd') && dl.suggestedFilename().endsWith('.ics'), dl.suggestedFilename());
+  const gcal = new URL(await admin.getByRole('link', { name: 'Add to Google Calendar' }).getAttribute('href'));
+  check('Add to Google Calendar opens Google with the meeting filled in', gcal.hostname === 'calendar.google.com' && gcal.searchParams.get('dates') === '20261115T133000/20261115T143000' && gcal.searchParams.get('location') === '100 Sample Rd');
   await admin.getByLabel('Log entry').fill('Called, he wants plans first');
   await admin.getByRole('button', { name: 'Add to log' }).click();
   await admin.getByText('Called, he wants plans first').waitFor();
