@@ -88,3 +88,32 @@ describe('calendar file', () => {
     expect(appointmentIcs(lead({ name: 'Sam, Pat; Lee' }), appt())).toContain('SUMMARY:Meet Sam\\, Pat\\; Lee');
   });
 });
+
+describe('making it easy', () => {
+  it('counts days and knows the next stage', async () => {
+    const { addDays, nextStage } = await import('../src/domain/leads');
+    expect(addDays('2026-11-30', 1)).toBe('2026-12-01');
+    expect(addDays('2026-11-12', 7)).toBe('2026-11-19');
+    expect(nextStage('new')).toBe('appointment');
+    expect(nextStage('quoted')).toBe('won');
+    expect(nextStage('won')).toBeNull();
+    expect(nextStage('lost')).toBeNull();
+  });
+  it('lists what needs you: late first, then meetings and follow-ups by date, nothing past a week', async () => {
+    const { agenda } = await import('../src/domain/leads');
+    const today = '2026-11-12';
+    const list = agenda(
+      [
+        lead({ id: 'late', name: 'Late Lead', next_step: 'Call back', next_date: '2026-11-10' }),
+        lead({ id: 'meet', name: 'Pat Sample' }),
+        lead({ id: 'far', next_step: 'Later', next_date: '2026-12-20' }),
+        lead({ id: 'won', stage: 'won', next_date: '2026-11-01' }),
+      ],
+      [appt({ lead_id: 'meet' }), appt({ id: 'a2', lead_id: 'meet', appt_date: '2026-12-01' })],
+      today,
+    );
+    expect(list.map((x) => x.lead.id)).toEqual(['late', 'meet']);
+    expect(list[0].what).toBe('Call back');
+    expect(list[1].what).toBe('Meet Pat Sample at 1:30 PM, 100 Sample Rd');
+  });
+});

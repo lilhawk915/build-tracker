@@ -504,7 +504,7 @@ await step('leads', admin, async () => {
   await admin.getByLabel('New lead').fill('Sam Sample 5 lots 555-532-2471 wants to split profit or $30k a build');
   await admin.getByRole('button', { name: 'Add lead' }).click();
   await admin.getByRole('button', { name: 'Add an appointment' }).waitFor();
-  const leadId = admin.url().split('/leads/')[1];
+  const leadId = admin.url().split('/leads/')[1].split('?')[0];
   const row = () => JSON.parse(sql(`select row_to_json(l) from public.leads l where id = '${leadId}';`));
   let l = row();
   check('Quick add pulls out the name, phone and 5 houses, and keeps the whole line', l.name === 'Sam Sample' && l.phone === '555-532-2471' && l.houses === 5 && l.notes.includes('split profit') && l.stage === 'new', JSON.stringify(l).slice(0, 200));
@@ -516,7 +516,7 @@ await step('leads', admin, async () => {
   await admin.getByRole('button', { name: 'Add an appointment' }).click();
   await admin.getByLabel('Date', { exact: true }).fill('2026-11-15');
   await admin.getByLabel('Time', { exact: true }).fill('13:30');
-  await admin.getByLabel('Where').fill('100 Sample Rd');
+  await admin.getByLabel('Where', { exact: true }).fill('100 Sample Rd');
   await admin.getByRole('button', { name: 'Add appointment' }).click();
   await admin.getByText('Sun, Nov 15, 1:30 PM').waitFor();
   l = row();
@@ -528,19 +528,42 @@ await step('leads', admin, async () => {
   await admin.getByRole('button', { name: 'Add to log' }).click();
   await admin.getByText('Called, he wants plans first').waitFor();
   check('Log entries save', row().log[0].text === 'Called, he wants plans first');
+  await admin.getByRole('button', { name: 'Left a voicemail' }).click();
+  await admin.locator('.loglist').getByText('Left a voicemail').waitFor();
+  check('One-tap log buttons save an entry', row().log[0].text === 'Left a voicemail');
+  check('A lead with a phone gets Call and Text buttons', await admin.getByRole('link', { name: 'Call 555-532-2471' }).isVisible() && (await admin.getByRole('link', { name: 'Text', exact: true }).getAttribute('href')) === 'sms:5555322471');
+  await typeIn(admin.getByLabel('Next step', { exact: true }), 'Send plans');
+  await admin.getByRole('button', { name: 'Tomorrow' }).click();
+  await admin.waitForTimeout(600);
+  l = row();
+  const tomorrow = new Date(Date.now() + 864e5 - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+  check('What\'s next: a step and a one-tap Tomorrow date', l.next_step === 'Send plans' && l.next_date === tomorrow, `${l.next_step} ${l.next_date}`);
+  await admin.getByRole('button', { name: '✓ Done' }).click();
+  await admin.waitForTimeout(600);
+  l = row();
+  check('Done clears the step and logs it', l.next_step === '' && l.next_date === null && l.log[0].text === 'Done: Send plans');
+  await admin.getByRole('group', { name: 'Stage' }).getByRole('button', { name: 'Met / walked it' }).click();
+  await admin.waitForTimeout(600);
+  check('Tapping a stage moves the lead', row().stage === 'met');
+  await admin.getByRole('group', { name: 'Stage' }).getByRole('button', { name: 'Appointment set' }).click();
+  await admin.waitForTimeout(600);
 
   await admin.goto(`${BASE}/leads`);
   const col = admin.getByRole('region', { name: /^Appointment set/ });
-  await col.getByRole('link', { name: 'Sam Sample' }).waitFor();
+  await col.getByRole('link', { name: 'Sam Sample', exact: true }).waitFor();
   const board = await admin.locator('main').innerText();
   check('Board shows the lead under Appointment set with its meeting and value', (await col.innerText()).includes('Meet Sun, Nov 15, 1:30 PM') && (await col.innerText()).includes('$150,000'));
   check('Board totals open leads, houses and projected profit', /1 open lead · 5 houses · \$150,000 projected profit/.test(board), board.slice(0, 300));
   await admin.screenshot({ path: `${out}/est-07-leads.png`, fullPage: true });
-  await admin.getByLabel('Stage for Sam Sample').selectOption('waiting');
-  await admin.getByRole('region', { name: /^Waiting on prices/ }).getByRole('link', { name: 'Sam Sample' }).waitFor();
-  check('Moving a card changes its stage', row().stage === 'waiting');
+  await admin.getByRole('button', { name: 'Move Sam Sample to Met / walked it' }).click();
+  await admin.getByRole('region', { name: /^Met \/ walked it/ }).getByRole('link', { name: 'Sam Sample', exact: true }).waitFor();
+  check('The next-stage button on a card moves it', row().stage === 'met');
+  await admin.locator('.leadcard', { hasText: 'Sam Sample' }).dragTo(admin.getByRole('region', { name: /^Waiting on prices/ }));
+  await admin.getByRole('region', { name: /^Waiting on prices/ }).getByRole('link', { name: 'Sam Sample', exact: true }).waitFor();
+  check('Dragging a card to a column moves it', row().stage === 'waiting');
 
-  await admin.getByRole('link', { name: 'Sam Sample' }).click();
+  check('Do these next lists the meeting', (await admin.getByRole('region', { name: 'Do these next' }).innerText()).includes('Meet Sam Sample at 1:30 PM, 100 Sample Rd'));
+  await admin.locator('.leadcard').getByRole('link', { name: 'Sam Sample', exact: true }).click();
   await admin.getByRole('button', { name: 'Make it a job' }).click();
   await admin.getByLabel('Job name').fill('Sample Lot 1 - Sam Sample');
   await admin.getByRole('button', { name: 'Make the job' }).click();
@@ -576,7 +599,7 @@ await step('phone', admin, async () => {
   await admin.goto(`${BASE}/leads`);
   await admin.getByRole('heading', { name: 'Leads' }).waitFor();
   const over2 = await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  check('Leads board fits a phone screen (columns scroll inside the board)', over2 <= 0, `${over2}px`);
+  check('Leads board fits a phone screen (columns stack)', over2 <= 0, `${over2}px`);
   await admin.screenshot({ path: `${out}/est-08-leads-phone.png`, fullPage: true });
 });
 

@@ -129,3 +129,42 @@ export function pipeline(leads: Lead[]) {
     unpriced: open.filter((l) => leadValue(l) == null).length,
   };
 }
+
+/** A date some days after another: addDays('2026-11-12', 1) → '2026-11-13'. */
+export function addDays(day: string, n: number): string {
+  const d = new Date(`${day}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The stage a lead usually goes to next, for the one-tap button. Null once it's won or lost. */
+export function nextStage(s: LeadStage): LeadStage | null {
+  const open: LeadStage[] = LEAD_STAGES.map((x) => x.value).filter((v) => v !== 'lost');
+  const i = open.indexOf(s);
+  return i < 0 || i >= open.length - 1 ? null : open[i + 1];
+}
+
+/** One-tap log entries for the things that happen most. */
+export const QUICK_LOGS = ['Called, no answer', 'Left a voicemail', 'Texted', 'Talked to them'];
+
+export type AgendaItem = { lead: Lead; date: string; what: string; due: 'late' | 'today' | 'soon' | 'week'; meet: boolean };
+
+/**
+ * What needs you: meetings in the next 7 days and follow-ups that are late or due within 3 days.
+ * Late ones first, then by date.
+ */
+export function agenda(leads: Lead[], appts: LeadAppointment[], today: string): AgendaItem[] {
+  const week = addDays(today, 7);
+  const items: AgendaItem[] = [];
+  for (const l of leads) {
+    if (!isOpenLead(l)) continue;
+    const due = followUp(l, today);
+    if (due && l.next_date) items.push({ lead: l, date: l.next_date, what: l.next_step || 'Follow up', due, meet: false });
+    for (const a of appts) {
+      if (a.lead_id !== l.id || a.appt_date < today || a.appt_date > week) continue;
+      items.push({ lead: l, date: a.appt_date + (a.appt_time ? `T${a.appt_time}` : ''), what: `Meet ${l.name}${a.appt_time ? ` at ${timeText(a.appt_time)}` : ''}${a.place ? `, ${a.place}` : ''}`, due: a.appt_date === today ? 'today' : 'week', meet: true });
+    }
+  }
+  const rank = { late: 0, today: 1, soon: 2, week: 2 };
+  return items.sort((a, b) => rank[a.due] - rank[b.due] || a.date.localeCompare(b.date));
+}

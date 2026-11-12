@@ -258,13 +258,55 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
 @media (max-width: 600px) { .jobcash { margin: 6px 0 0; text-align: left; } }
 
 /* Leads board: one column per stage. On a phone the columns scroll sideways inside the board, not the page. */
-.quickadd input { flex: 1; min-width: 220px; padding: 10px; font: inherit; border: 1.5px solid var(--rule); border-radius: 3px; background: var(--board); }
+.quickadd { display: grid; gap: 8px; border-top: 5px solid var(--tape); }
+.quickadd label { font-size: 15px; }
+.quickadd input { flex: 1; min-width: 220px; padding: 12px; font: inherit; font-size: 16px; border: 1.5px solid var(--rule); border-radius: 3px; background: #fff; }
+.todo h2 { font-size: 22px; margin-bottom: 8px; }
+.todo li { padding: 6px 0; border-top: 1px solid var(--slab); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.todo li:first-child { border-top: 0; }
+.todo .chip { min-width: 92px; text-align: center; }
 .leadboard { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(176px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 6px; }
-.leadcol { background: var(--slab); border: 1px solid var(--rule); border-radius: 3px; padding: 10px; min-height: 120px; }
+.leadcol { background: var(--slab); border: 1px solid var(--rule); border-radius: 3px; padding: 10px; min-height: 120px; transition: background .12s, border-color .12s; }
+.leadcol.over { background: #dcebe5; border-color: var(--pine); border-style: dashed; }
 .leadcol h2 { font-size: 18px; margin-bottom: 8px; }
 .leadcol ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.leadcard { background: var(--board); border: 1px solid var(--rule); border-radius: 3px; padding: 10px; display: grid; gap: 4px; }
-.leadcard .leadname { font-weight: 700; }
+.leadcard { background: var(--board); border: 1px solid var(--rule); border-radius: 3px; padding: 10px; display: grid; gap: 4px; cursor: grab; }
+.leadcard:hover { border-color: var(--steel); }
+.leadcard.dragging { opacity: .45; }
+.leadcard .leadname { font-weight: 700; font-size: 17px; }
 .leadcard .appt { color: var(--pine); font-weight: 600; }
-.leadcard select { margin-top: 4px; width: 100%; }
+.cardbtns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.cardbtns .btn { flex: 1 1 auto; justify-content: center; }
 .appt-row.past { opacity: 0.6; }
+.leadhead { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+.leadhead p { margin: 4px 0 0; }
+.btn.big { min-height: 48px; padding: 12px 18px; font-size: 17px; }
+.addphone { gap: 8px; font-weight: 600; }
+.addphone input { width: 170px; }
+.stagebar { display: flex; flex-wrap: wrap; gap: 6px; }
+.stagebar .btn { border-color: var(--rule); }
+.stagebar .btn.on, .btn.tiny.on { background: var(--pine); border-color: var(--pine); color: #fff; }
+.stagebar .btn.lostbtn { margin-left: auto; color: var(--steel); }
+.stagebar .btn.lostbtn.on { background: var(--flag); border-color: var(--flag); color: #fff; }
+.nextstep { border-left: 5px solid var(--pine); }
+.nextstep.late { border-left-color: var(--flag); }
+.nextstep.today { border-left-color: var(--amber); }
+.nextstep .field:not(.datebox) { width: 100%; font-size: 16px; padding: 10px; }
+.nextstep .datebox { width: auto; }
+.loglist li { padding: 4px 0; border-top: 1px solid var(--slab); }
+.leadfields { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 16px; }
+.leadfield { display: grid; gap: 4px; }
+.leadfield > span { font-size: 13px; font-weight: 600; color: var(--steel); }
+.leadfield.wide { grid-column: 1 / -1; }
+.leadfield input, .leadfield select { width: 100%; }
+@media (max-width: 860px) {
+  .leadboard { grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; }
+  .leadcol { min-height: 0; }
+  .leadcol.empty { padding: 6px 10px; }
+  .leadcol.empty h2 { margin: 0; }
+  .leadcol.empty p { display: none; }
+  .dragtip { display: none; }
+  .contactbtns { width: 100%; }
+  .contactbtns .btn { flex: 1; justify-content: center; }
+  .stagebar .btn.lostbtn { margin-left: 0; }
+}
