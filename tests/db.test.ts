@@ -908,3 +908,42 @@ describe('invoices', () => {
     expect(left).toEqual({ job_id: null, estimate_id: null });
   });
 });
+
+describe('leads', () => {
+  it('lets admins add leads and appointments, with sensible defaults', async () => {
+    const [l] = await as<{ id: string; stage: string; kind: string; houses: number; log: unknown[] }>(ADMIN, `insert into public.leads (name, houses, profit_per_house_cents) values ('Sample lead', 5, 3000000) returning id, stage, kind, houses, log`);
+    expect([l.stage, l.kind, l.houses, l.log]).toEqual(['new', 'custom_home', 5, []]);
+    const [a] = await as<{ appt_time: string | null }>(ADMIN, `insert into public.lead_appointments (lead_id, appt_date) values ($1, '2026-11-15') returning appt_time`, [l.id]);
+    expect(a.appt_time).toBeNull();
+    await as(ADMIN, `update public.leads set stage = 'appointment', log = '[{"at":"2026-11-12T10:00:00Z","text":"Called"}]' where id = $1`, [l.id]);
+  });
+  it('refuses unknown stages and types, zero houses, negative profit, and a log that is not a list', async () => {
+    await expect(as(ADMIN, `insert into public.leads (stage) values ('maybe')`)).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.leads (kind) values ('boat')`)).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.leads (houses) values (0)`)).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.leads (profit_per_house_cents) values (-1)`)).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.leads (log) values ('{}')`)).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.lead_appointments (lead_id) select id from public.leads limit 1`)).rejects.toThrow();
+  });
+  it('keeps leads and appointments from staff, subs, no-access logins, and visitors', async () => {
+    for (const who of [STAFF, SUB_A, NOBODY]) {
+      for (const t of ['leads', 'lead_appointments']) {
+        expect(await as(who, `select * from public.${t}`), `${who} ${t}`).toHaveLength(0);
+      }
+      expect(await as(who, `update public.leads set name = 'x' returning id`), who).toHaveLength(0);
+      await expect(as(who, `insert into public.leads (name) values ('x')`), who).rejects.toThrow();
+    }
+    await expect(as(null, 'select * from public.leads')).rejects.toThrow();
+    await expect(as(null, 'select * from public.lead_appointments')).rejects.toThrow();
+  });
+  it('drops appointments with their lead, and keeps the lead when its job is deleted', async () => {
+    const [j] = await as<{ id: string }>(ADMIN, `insert into public.jobs (name) values ('Lead job') returning id`);
+    const [l] = await as<{ id: string }>(ADMIN, `insert into public.leads (name, job_id, stage) values ('Won lead', $1, 'won') returning id`, [j.id]);
+    await as(ADMIN, `insert into public.lead_appointments (lead_id, appt_date) values ($1, current_date)`, [l.id]);
+    await as(ADMIN, 'delete from public.jobs where id = $1', [j.id]);
+    const [left] = await as<{ job_id: string | null }>(ADMIN, 'select job_id from public.leads where id = $1', [l.id]);
+    expect(left.job_id).toBeNull();
+    await as(ADMIN, 'delete from public.leads where id = $1', [l.id]);
+    expect(await as(ADMIN, 'select * from public.lead_appointments where lead_id = $1', [l.id])).toHaveLength(0);
+  });
+});

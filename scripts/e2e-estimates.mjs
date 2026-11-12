@@ -496,6 +496,76 @@ await step('invoices are admin only', staff, async () => {
   check('Staff do not see job amounts or projected profit on All jobs', !(await staff.locator('main').innerText()).includes('Projected profit'));
 });
 
+await step('leads', admin, async () => {
+  sql(`delete from public.leads;`);
+  await admin.goto(`${BASE}/leads`);
+  await admin.getByRole('heading', { name: 'Leads' }).waitFor();
+  check('Admins have a Leads link', (await admin.locator('.topbar nav').innerText()).includes('Leads'));
+  await admin.getByLabel('New lead').fill('Sam Sample 5 lots 555-532-2471 wants to split profit or $30k a build');
+  await admin.getByRole('button', { name: 'Add lead' }).click();
+  await admin.getByRole('button', { name: 'Add an appointment' }).waitFor();
+  const leadId = admin.url().split('/leads/')[1];
+  const row = () => JSON.parse(sql(`select row_to_json(l) from public.leads l where id = '${leadId}';`));
+  let l = row();
+  check('Quick add pulls out the name, phone and 5 houses, and keeps the whole line', l.name === 'Sam Sample' && l.phone === '555-532-2471' && l.houses === 5 && l.notes.includes('split profit') && l.stage === 'new', JSON.stringify(l).slice(0, 200));
+  await typeIn(admin.getByLabel('Profit per house'), 30000);
+  await admin.getByLabel('Type').selectOption('investor');
+  await typeIn(admin.getByLabel('Deal terms'), 'Split profit, or $30K a build');
+  await admin.waitForTimeout(800);
+  check('Lead page shows 5 houses x $30,000 = $150,000 projected profit', (await admin.locator('main').innerText()).includes('$150,000'));
+  await admin.getByRole('button', { name: 'Add an appointment' }).click();
+  await admin.getByLabel('Date', { exact: true }).fill('2026-11-15');
+  await admin.getByLabel('Time', { exact: true }).fill('13:30');
+  await admin.getByLabel('Where').fill('100 Sample Rd');
+  await admin.getByRole('button', { name: 'Add appointment' }).click();
+  await admin.getByText('Sun, Nov 15, 1:30 PM').waitFor();
+  l = row();
+  check('An appointment moves a new lead to Appointment set', l.stage === 'appointment' && l.kind === 'investor' && Number(l.profit_per_house_cents) === 3000000);
+  const [dl] = await Promise.all([admin.waitForEvent('download'), admin.getByRole('button', { name: 'Add to calendar' }).click()]);
+  const ics = readFileSync(await dl.path(), 'utf8');
+  check('Add to calendar gives a 1:30 PM calendar file with the place', ics.includes('DTSTART:20261115T133000') && ics.includes('LOCATION:100 Sample Rd') && dl.suggestedFilename().endsWith('.ics'), dl.suggestedFilename());
+  await admin.getByLabel('Log entry').fill('Called, he wants plans first');
+  await admin.getByRole('button', { name: 'Add to log' }).click();
+  await admin.getByText('Called, he wants plans first').waitFor();
+  check('Log entries save', row().log[0].text === 'Called, he wants plans first');
+
+  await admin.goto(`${BASE}/leads`);
+  const col = admin.getByRole('region', { name: /^Appointment set/ });
+  await col.getByRole('link', { name: 'Sam Sample' }).waitFor();
+  const board = await admin.locator('main').innerText();
+  check('Board shows the lead under Appointment set with its meeting and value', (await col.innerText()).includes('Meet Sun, Nov 15, 1:30 PM') && (await col.innerText()).includes('$150,000'));
+  check('Board totals open leads, houses and projected profit', /1 open lead · 5 houses · \$150,000 projected profit/.test(board), board.slice(0, 300));
+  await admin.screenshot({ path: `${out}/est-07-leads.png`, fullPage: true });
+  await admin.getByLabel('Stage for Sam Sample').selectOption('waiting');
+  await admin.getByRole('region', { name: /^Waiting on prices/ }).getByRole('link', { name: 'Sam Sample' }).waitFor();
+  check('Moving a card changes its stage', row().stage === 'waiting');
+
+  await admin.getByRole('link', { name: 'Sam Sample' }).click();
+  await admin.getByRole('button', { name: 'Make it a job' }).click();
+  await admin.getByLabel('Job name').fill('Sample Lot 1 - Sam Sample');
+  await admin.getByRole('button', { name: 'Make the job' }).click();
+  await admin.waitForURL(/\/jobs\//);
+  l = row();
+  const job = JSON.parse(sql(`select row_to_json(j) from public.jobs j where id = '${l.job_id}';`));
+  check('Make it a job marks the lead won and sets up the job with the client', l.stage === 'won' && job.name === 'Sample Lot 1 - Sam Sample' && job.client_phone === '555-532-2471' && sql(`select count(*) > 0 from public.budget_lines where job_id = '${job.id}';`) === 't');
+  await admin.goto(`${BASE}/leads`);
+  await admin.getByRole('heading', { name: 'Leads' }).waitFor();
+  await admin.waitForTimeout(400);
+  check('Won leads drop out of the open total', (await admin.locator('main').innerText()).includes('0 open leads'));
+});
+
+await step('leads are admin only', staff, async () => {
+  await staff.goto(`${BASE}/`);
+  await staff.locator('.topbar').waitFor();
+  check('Staff have no Leads link', !(await staff.locator('.topbar nav').innerText()).includes('Leads'));
+  await staff.goto(`${BASE}/leads`);
+  await staff.getByText('Leads are for admins').waitFor().catch(() => {});
+  check('Staff are turned away from the leads page', (await staff.locator('main').innerText()).includes('Leads are for admins'));
+  check('Staff read no leads or appointments through the API', ((await rest(staff, 'leads?select=*')).json ?? []).length === 0 && ((await rest(staff, 'lead_appointments?select=*')).json ?? []).length === 0);
+  const forced = await rest(staff, 'leads', { method: 'POST', body: JSON.stringify({ name: 'sneaky' }) });
+  check('Staff cannot add a lead through the API', forced.status >= 400, String(forced.status));
+});
+
 await step('phone', admin, async () => {
   await admin.setViewportSize({ width: 390, height: 844 });
   await admin.goto(`${BASE}/estimates/${estId}`);
@@ -503,6 +573,11 @@ await step('phone', admin, async () => {
   const over = await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   check('Estimate page fits a phone screen (line table scrolls inside its box)', over <= 0, `${over}px`);
   await admin.screenshot({ path: `${out}/est-06-phone.png`, fullPage: true });
+  await admin.goto(`${BASE}/leads`);
+  await admin.getByRole('heading', { name: 'Leads' }).waitFor();
+  const over2 = await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  check('Leads board fits a phone screen (columns scroll inside the board)', over2 <= 0, `${over2}px`);
+  await admin.screenshot({ path: `${out}/est-08-leads-phone.png`, fullPage: true });
 });
 
 check('No crashes in the browser', problems.length === 0, problems.slice(0, 3).join(' | '));

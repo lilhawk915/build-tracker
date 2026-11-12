@@ -90,7 +90,7 @@ export function Modal({ title, wide, onClose, children }: { title: string; wide?
 export interface FieldDef {
   key: string;
   label: string;
-  type?: 'text' | 'money' | 'date' | 'select' | 'textarea' | 'check' | 'email' | 'file' | 'files' | 'number';
+  type?: 'text' | 'money' | 'date' | 'select' | 'textarea' | 'check' | 'email' | 'file' | 'files' | 'number' | 'time';
   options?: { value: string; label: string }[];
   required?: boolean;
   help?: string;
@@ -129,7 +129,7 @@ export function FormModal({ title, fields, initial, submit, onClose, onSave, int
         if (c == null || (c < 0 && !f.allowNegative)) { setErr(`${f.label}: enter a dollar amount like 12500.50`); return; }
         out[f.key] = c;
       }
-      if (f.type === 'date') out[f.key] = vals[f.key] || null;
+      if (f.type === 'date' || f.type === 'time') out[f.key] = vals[f.key] || null;
       if (f.type === 'number') {
         const raw = String(vals[f.key]).replace(/,/g, '').trim();
         if (raw !== '' && !Number.isFinite(Number(raw))) { setErr(`${f.label}: enter a number`); return; }
@@ -180,7 +180,7 @@ export function FormModal({ title, fields, initial, submit, onClose, onSave, int
                 <input
                   id={`${uid}-${f.key}`}
                   aria-describedby={f.help ? `${uid}-${f.key}-help` : undefined}
-                  type={f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : 'text'}
+                  type={f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : f.type === 'email' ? 'email' : 'text'}
                   inputMode={f.type === 'money' || f.type === 'number' ? 'decimal' : undefined}
                   required={f.required}
                   value={String(v)}

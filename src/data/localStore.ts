@@ -54,7 +54,7 @@ function visible<T extends TableName>(table: T, rows: Tables[T][]): Tables[T][] 
   }
   if (p.role === 'staff') {
     if (['vendor_contacts', 'auto_text_settings', 'auto_texts'].includes(table) && !p.can_view_contacts) return [];
-    if (['estimate_markups', 'estimate_versions', 'markup_defaults', 'invoices'].includes(table)) return [];
+    if (['estimate_markups', 'estimate_versions', 'markup_defaults', 'invoices', 'leads', 'lead_appointments'].includes(table)) return [];
     if (table === 'profiles' && !p.can_view_contacts) return rows.filter((r) => (r as Profile).role !== 'sub');
     return rows;
   }
@@ -146,8 +146,19 @@ export const localStore: Store = {
         }
       }
       if (table === 'pos') row.approved_co_cents = 0;
+      // Demos saved before a table existed don't have it yet.
+      (db as Record<string, unknown[]>)[table] ??= [];
+      if (table === 'leads') {
+        row.created_at ??= new Date().toISOString(); row.updated_at ??= row.created_at;
+        for (const k of ['name', 'phone', 'email', 'address', 'county', 'deal_terms', 'source', 'next_step', 'lost_reason', 'notes']) row[k] ??= '';
+        row.kind ??= 'custom_home'; row.stage ??= 'new'; row.houses ??= 1; row.log ??= [];
+        for (const k of ['profit_per_house_cents', 'next_date', 'job_id', 'estimate_id']) row[k] ??= null;
+      }
+      if (table === 'lead_appointments') {
+        if (!row.appt_date) throw new Error('Pick a date for the appointment.');
+        row.appt_time ??= null; row.place ??= ''; row.who ??= ''; row.notes ??= '';
+      }
       if (table === 'invoices') {
-        db.invoices ??= [];
         row.number ??= Math.max(1000, ...db.invoices.map((i) => i.number)) + 1;
         if (db.invoices.some((i) => i.number === row.number)) throw new Error(`Invoice ${row.number} already exists.`);
         row.lines ??= []; row.paid_cents ??= 0; row.paid_date ??= null; row.terms ??= 'Due on receipt'; row.notes ??= '';
@@ -221,6 +232,8 @@ export const localStore: Store = {
         (db[t] as unknown as { job_id: string }[]) = (db[t] as unknown as { job_id: string }[]).filter((r) => r.job_id !== id);
       }
     }
+    if (table === 'leads') db.lead_appointments = (db.lead_appointments ?? []).filter((a) => a.lead_id !== id);
+    if (table === 'jobs') for (const l of db.leads ?? []) if (l.job_id === id) l.job_id = null;
     rows.splice(i, 1);
     syncCo(db);
     save();

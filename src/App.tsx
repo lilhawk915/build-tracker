@@ -17,6 +17,8 @@ import { DrawSheetPage } from './pages/DrawSheetPage';
 import { JobPage } from './pages/JobPage';
 import { Login } from './pages/Login';
 import { Portal } from './pages/Portal';
+import { LeadPage } from './pages/leads/LeadPage';
+import { LeadsPage } from './pages/leads/LeadsPage';
 import { SearchPage } from './pages/SearchPage';
 import { Subs } from './pages/Subs';
 import { Team } from './pages/Team';
@@ -45,6 +47,7 @@ function Shell({ me, onSignOut }: { me: Profile; onSignOut: () => void }) {
         <NavLink to="/" className="brand"><i aria-hidden="true" />Build Tracker</NavLink>
         <nav aria-label="Main">
           {staff && <NavLink to="/" end>Today</NavLink>}
+          {me.role === 'admin' && <NavLink to="/leads">Leads</NavLink>}
           {staff && <NavLink to="/calls">Call list</NavLink>}
           {staff && <NavLink to="/estimates">Estimates</NavLink>}
           {me.role === 'admin' && <NavLink to="/invoices">Invoices</NavLink>}
@@ -85,6 +88,8 @@ function Shell({ me, onSignOut }: { me: Profile; onSignOut: () => void }) {
               <>
                 <Route path="/" element={<Today />} />
                 <Route path="/search" element={<SearchPage />} />
+                <Route path="/leads" element={me.role === 'admin' ? <LeadsPage /> : <div className="alert">Leads are for admins.</div>} />
+                <Route path="/leads/:leadId" element={me.role === 'admin' ? <LeadPage /> : <div className="alert">Leads are for admins.</div>} />
                 <Route path="/estimates" element={<EstimatesPage />} />
                 <Route path="/estimates/catalog" element={<CatalogPage />} />
                 <Route path="/estimates/import" element={me.role === 'admin' ? <ImportPage /> : <div className="alert">Importing is for admins.</div>} />

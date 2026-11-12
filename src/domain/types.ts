@@ -143,6 +143,20 @@ export interface Invoice {
   paid_date: string | null; notes: string; created_at: string; kind: InvoiceKind;
 }
 
+export type LeadKind = 'custom_home' | 'investor' | 'development' | 'multi_family' | 'remodel' | 'other';
+export type LeadStage = 'new' | 'appointment' | 'met' | 'waiting' | 'quoted' | 'won' | 'lost';
+export interface LeadLogEntry { at: string; text: string }
+/** Someone who wants you to build for them, before there is a job. Admins only. */
+export interface Lead {
+  id: string; name: string; phone: string; email: string; kind: LeadKind; stage: LeadStage;
+  address: string; county: string; houses: number; profit_per_house_cents: number | null; deal_terms: string;
+  source: string; next_step: string; next_date: string | null; lost_reason: string; notes: string;
+  log: LeadLogEntry[]; job_id: string | null; estimate_id: string | null; created_at: string; updated_at: string;
+}
+export interface LeadAppointment {
+  id: string; lead_id: string; appt_date: string; appt_time: string | null; place: string; who: string; notes: string;
+}
+
 export interface Tables {
   vendors: Vendor; profiles: Profile; team_invites: Invite; jobs: Job; budget_lines: BudgetLine; pos: Po; bills: Bill;
   change_orders: ChangeOrder; draws: Draw; draw_lines: DrawLine; lien_waivers: Waiver; tasks: Task;
@@ -151,7 +165,7 @@ export interface Tables {
   auto_text_settings: AutoTextSettings; auto_texts: AutoTextLog;
   estimates: EstimateRow; estimate_markups: MarkupsRow; estimate_versions: EstimateVersionRow; catalog_items: CatalogRow;
   company_settings: CompanyRow & { id: string }; markup_defaults: MarkupDefaultsRow & { id: string }; expenses: Expense;
-  invoices: Invoice;
+  invoices: Invoice; leads: Lead; lead_appointments: LeadAppointment;
 }
 export type TableName = keyof Tables;
 

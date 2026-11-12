@@ -256,3 +256,15 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
 .jobcash dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 .jobcash dd.bad { color: #b91c1c; }
 @media (max-width: 600px) { .jobcash { margin: 6px 0 0; text-align: left; } }
+
+/* Leads board: one column per stage. On a phone the columns scroll sideways inside the board, not the page. */
+.quickadd input { flex: 1; min-width: 220px; padding: 10px; font: inherit; border: 1.5px solid var(--rule); border-radius: 3px; background: var(--board); }
+.leadboard { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(176px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.leadcol { background: var(--slab); border: 1px solid var(--rule); border-radius: 3px; padding: 10px; min-height: 120px; }
+.leadcol h2 { font-size: 18px; margin-bottom: 8px; }
+.leadcol ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.leadcard { background: var(--board); border: 1px solid var(--rule); border-radius: 3px; padding: 10px; display: grid; gap: 4px; }
+.leadcard .leadname { font-weight: 700; }
+.leadcard .appt { color: var(--pine); font-weight: 600; }
+.leadcard select { margin-top: 4px; width: 100%; }
+.appt-row.past { opacity: 0.6; }
