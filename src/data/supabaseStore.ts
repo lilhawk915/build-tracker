@@ -48,6 +48,31 @@ export function makeSupabaseStore(url: string, key: string): Store {
     async signOut() {
       await sb.auth.signOut();
     },
+    async signInPassword(username, password) {
+      const typed = username.trim().toLowerCase();
+      let email = typed;
+      if (!typed.includes('@')) {
+        const { data, error } = await sb.rpc('login_email', { u: typed });
+        if (error) throw new Error(error.message);
+        email = (data as string | null) ?? '';
+      }
+      const wrong = 'That username or password is wrong. Check it and try again.';
+      if (!email) throw new Error(wrong);
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw new Error(/invalid login credentials/i.test(error.message) ? wrong : error.message);
+    },
+    async setLogin(email, username, password) {
+      const { error, response } = await sb.functions.invoke('set-login', { body: { email, username, password } }) as { error: Error | null; response?: Response };
+      if (error) {
+        const detail = await response?.clone().json().catch(() => null);
+        throw new Error(detail?.error ?? 'The login could not be saved. Try again.');
+      }
+    },
+    async changePassword(password) {
+      if (password.length < 8) throw new Error('Passwords need at least 8 characters.');
+      const { error } = await sb.auth.updateUser({ password });
+      if (error) throw new Error(/different from the old/i.test(error.message) ? 'That is already your password. Pick a new one.' : error.message);
+    },
     async list(table) {
       // The API caps each response at 1,000 rows, so keep reading until a short page.
       const all: unknown[] = [];

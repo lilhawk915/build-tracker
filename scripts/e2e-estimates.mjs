@@ -30,6 +30,7 @@ async function makeUser(email, role) {
 }
 async function signIn(page, email) {
   await page.goto(BASE);
+  await page.getByRole('button', { name: 'Sign in with an emailed code instead' }).click();
   await page.getByLabel('Email').fill(email);
   await new Promise((r) => setTimeout(r, 1500));
   const t = Date.now();
@@ -245,6 +246,7 @@ await step('code sign-in', staff, async () => {
   const phone = await ctx.newPage();
   phone.setDefaultTimeout(12000);
   await phone.goto(BASE);
+  await phone.getByRole('button', { name: 'Sign in with an emailed code instead' }).click();
   await phone.getByLabel('Email').fill('eststaff@test.local');
   await new Promise((r) => setTimeout(r, 1500));
   const t = Date.now();
@@ -280,6 +282,7 @@ await step('pasted-link sign-in', staff, async () => {
   const phone = await ctx.newPage();
   phone.setDefaultTimeout(12000);
   await phone.goto(BASE);
+  await phone.getByRole('button', { name: 'Sign in with an emailed code instead' }).click();
   await phone.getByLabel('Email').fill('eststaff@test.local');
   await new Promise((r) => setTimeout(r, 1500));
   const t = Date.now();

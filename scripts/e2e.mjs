@@ -398,7 +398,7 @@ await page.getByRole('heading', { name: 'Who did each step' }).waitFor();
 check('staff job record has no sub phones', !(await text()).includes('937-555-0100'));
 await page.goto(`${BASE}/team`);
 await page.getByRole('heading', { name: 'Today' }).waitFor();
-check('staff are sent away from the Team page', !(await text()).includes('Invite someone'));
+check('staff are sent away from the Team page', !(await text()).includes('Add someone'));
 await page.getByLabel('Viewing as').selectOption('demo-admin');
 await page.getByRole('heading', { name: 'Today' }).waitFor();
 

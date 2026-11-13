@@ -82,6 +82,7 @@ export function Subs() {
   const { data, run, me } = useData();
   const [edit, setEdit] = useState<Vendor | 'new' | null>(null);
   const [inviting, setInviting] = useState<Vendor | null>(null);
+  const [told, setTold] = useState<{ who: string; username: string; password: string } | null>(null);
   const [contactsFor, setContactsFor] = useState<Vendor | null>(null);
   const isAdmin = me.role === 'admin';
   const contactsOk = canSeeContacts(me);
@@ -98,6 +99,13 @@ export function Subs() {
         <h1>Subs</h1>
         <button className="btn primary" onClick={() => setEdit('new')}>Add a sub</button>
       </div>
+      {told && (
+        <div className="alert calm" role="status" aria-label="New login">
+          <b>Tell {told.who}:</b> username <b style={{ fontFamily: 'var(--mono)' }}>{told.username}</b> · password <b style={{ fontFamily: 'var(--mono)' }}>{told.password}</b>
+          {' '}<button className="btn tiny" onClick={() => void navigator.clipboard?.writeText(`Build Tracker login\nUsername: ${told.username}\nPassword: ${told.password}\n${window.location.origin}${import.meta.env.BASE_URL}`)}>Copy to send</button>
+          {' '}<button className="linkish" onClick={() => setTold(null)}>Done</button>
+        </div>
+      )}
       {vendors.length === 0 ? <Empty>Add your subs and their insurance dates. Bills can't be paid without current insurance.</Empty> : (
         <div className="tablewrap">
           <table>
@@ -186,24 +194,34 @@ export function Subs() {
       {inviting && (
         <FormModal
           title={`Portal access for ${inviting.name}`}
-          submit="Send invite"
-          fields={[{ key: 'email', label: 'Their email', type: 'email', required: true }]}
-          initial={{ email: primaryContact(data.vendor_contacts, inviting.id)?.email ?? '' }}
+          submit="Save login"
+          fields={[
+            { key: 'email', label: 'Their email', type: 'email', required: true, help: 'Only used to tell people apart. Nothing is emailed.' },
+            { key: 'username', label: 'Username', required: true, help: 'One word, like their company or first name.' },
+            { key: 'password', label: 'Password', required: true, help: 'At least 8 characters. They can change it after signing in.' },
+          ]}
+          initial={{
+            email: primaryContact(data.vendor_contacts, inviting.id)?.email ?? '',
+            username: inviting.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30),
+            password: `${['Oak', 'Pine', 'Brick', 'Stone', 'Cedar'][Math.floor(Math.random() * 5)]}-${1000 + Math.floor(Math.random() * 9000)}`,
+          }}
           intro={<p className="muted">This login sees only {inviting.name}'s work orders, tasks, bills, and waivers. It never sees budgets, prices, loans, or other subs.</p>}
           onClose={() => setInviting(null)}
           onSave={async (v) => {
             const email = (v.email as string).trim().toLowerCase();
+            const username = String(v.username ?? '').trim().toLowerCase();
+            const password = String(v.password ?? '');
             const exists = data.team_invites.some((i) => i.email === email);
             const row = { role: 'sub' as const, vendor_id: inviting.id };
             const ok = await run(
               async () => {
                 if (exists) await store.update('team_invites', email, row);
                 else await store.insert('team_invites', { email, ...row });
-                await store.inviteUser(email);
+                await store.setLogin(email, username, password);
               },
-              `${email} is invited. A sign-in link is on its way.`,
+              'Login saved.',
             );
-            if (ok) setInviting(null);
+            if (ok) { setTold({ who: inviting.name, username, password }); setInviting(null); }
           }}
         />
       )}

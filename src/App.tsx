@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
-import { Toast, UndoButton } from './components/ui';
+import { FormModal, Toast, UndoButton } from './components/ui';
 import { DataProvider, store, useData } from './data';
 import { canSeeContacts, type Profile } from './domain/types';
 import { AutoTextsPage } from './pages/AutoTextsPage';
@@ -71,7 +71,7 @@ function Shell({ me, onSignOut }: { me: Profile; onSignOut: () => void }) {
             </select>
           </label>
         ) : (
-          <span className="who">{me.email} · <button className="linkish" onClick={onSignOut}>Sign out</button></span>
+          <span className="who">{me.username || me.email} · <ChangePassword /> · <button className="linkish" onClick={onSignOut}>Sign out</button></span>
         )}
       </header>
       {store.mode === 'local' && (
@@ -158,5 +158,32 @@ export function App() {
     <DataProvider key={`${me.id}-${version}`} me={me}>
       <Shell me={me} onSignOut={() => store.signOut()} />
     </DataProvider>
+  );
+}
+
+/** Lets anyone signed in pick their own password. */
+function ChangePassword() {
+  const [open, setOpen] = useState(false);
+  const { run } = useData();
+  return (
+    <>
+      <button className="linkish" onClick={() => setOpen(true)}>Change password</button>
+      {open && (
+        <FormModal
+          title="Change your password"
+          submit="Save password"
+          fields={[
+            { key: 'password', label: 'New password', required: true, help: 'At least 8 characters.' },
+            { key: 'again', label: 'Type it again', required: true },
+          ]}
+          initial={{}}
+          onClose={() => setOpen(false)}
+          onSave={async (v) => {
+            if (v.password !== v.again) throw new Error("Those two don't match. Type them again.");
+            if (await run(() => store.changePassword(String(v.password)), 'Password changed. Use it next time you sign in.')) setOpen(false);
+          }}
+        />
+      )}
+    </>
   );
 }

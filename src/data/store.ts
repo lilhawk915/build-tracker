@@ -7,6 +7,12 @@ export interface Store {
   signIn(email: string): Promise<string>;
   verifyCode(email: string, code: string): Promise<void>;
   signOut(): Promise<void>;
+  /** Signs in with a username (or email) and password. */
+  signInPassword(username: string, password: string): Promise<void>;
+  /** Admin only: gives someone a username and password. */
+  setLogin(email: string, username: string, password: string): Promise<void>;
+  /** Changes the signed-in person's own password. */
+  changePassword(password: string): Promise<void>;
   list<T extends TableName>(table: T): Promise<Tables[T][]>;
   insert<T extends TableName>(table: T, rows: Partial<Tables[T]> | Partial<Tables[T]>[]): Promise<void>;
   update<T extends TableName>(table: T, id: string, patch: Partial<Tables[T]>): Promise<void>;

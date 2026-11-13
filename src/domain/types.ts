@@ -58,7 +58,7 @@ export interface MaterialRequest {
   id: string; job_id: string; name: string; quantity: string; status: MaterialStatus; needed_by: string | null;
   expected_date: string | null; arrived_date: string | null; notes: string;
 }
-export interface Profile { id: string; email: string; name: string; role: Role; vendor_id: string | null; phone?: string; can_view_contacts?: boolean }
+export interface Profile { id: string; email: string; name: string; role: Role; vendor_id: string | null; phone?: string; can_view_contacts?: boolean; username?: string | null }
 export interface Invite { email: string; role: Exclude<Role, 'none'>; vendor_id: string | null }
 export interface Job {
   id: string; name: string; address: string; job_type: JobType; status: JobStatus;

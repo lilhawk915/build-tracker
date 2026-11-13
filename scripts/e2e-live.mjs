@@ -93,6 +93,7 @@ async function signInWithLink(key) {
   const p = people[key];
   use(key);
   await p.page.goto(BASE);
+  await p.page.getByRole('button', { name: 'Sign in with an emailed code instead' }).click();
   await p.page.getByLabel('Email').fill(p.email);
   await new Promise((r) => setTimeout(r, 1500)); // the login system allows one link a second per person
   const t = Date.now();
@@ -110,9 +111,14 @@ async function createFirstAdmin(email) {
 async function acceptInvite(key) {
   const p = people[key];
   use(key);
-  await p.page.goto(await latestLink(p.email, 0));
+  await p.page.goto(BASE);
+  await p.page.getByLabel('Username').fill(key.toLowerCase());
+  await p.page.getByLabel('Password').fill('Test-pass-123');
+  await p.page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await p.page.locator('.topbar, .login').first().waitFor();
+  await ready(p.page);
 }
+const setLoginCall = (token, email, username) => fetch(`${API}/functions/v1/set-login`, { method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, username, password: 'Sneaky-12345' }) });
 const inviteCall = (token, email) => fetch(`${API}/functions/v1/invite-user`, { method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
 // Reads the login token out of the browser, to attack the API directly the way a curious user could.
 const tokenOf = (p) => p.evaluate(() => {
@@ -160,7 +166,7 @@ await step('first owner login', async () => {
 });
 await step('magic link', async () => {
   await people.owner.page.locator('.who').getByRole('button', { name: 'Sign out' }).click();
-  await current.getByRole('button', { name: 'Email me a code' }).waitFor();
+  await current.getByRole('button', { name: 'Sign in', exact: true }).waitFor();
   check('Sign out returns to the login screen', true);
   await signInWithLink('owner');
   check('Sign in again with an emailed link', (await text()).includes('Today'));
@@ -171,6 +177,12 @@ await step('magic link', async () => {
 await step('stranger refused', async () => {
   const p = use('stranger');
   await p.goto(BASE);
+  await p.getByLabel('Username').fill('nobody');
+  await p.getByLabel('Password').fill('Wrong-12345');
+  await p.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await p.locator('.alert', { hasText: 'username or password is wrong' }).waitFor();
+  check('An unknown username is refused in plain language', true);
+  await p.getByRole('button', { name: 'Sign in with an emailed code instead' }).click();
   await p.getByLabel('Email').fill(STRANGER);
   await p.getByRole('button', { name: 'Email me a code' }).click();
   await p.locator('.alert').waitFor();
@@ -181,17 +193,20 @@ await step('stranger refused', async () => {
 await step('team allow', async () => {
   use('owner');
   await go('/team');
-  const allow = async (email, role) => {
-    await current.getByRole('button', { name: 'Invite someone' }).click();
+  const allow = async (email, role, username) => {
+    await current.getByRole('button', { name: 'Add someone' }).click();
     await modal().getByLabel('Email').fill(email);
     await modal().getByLabel('Role').selectOption(role);
-    await modal().getByRole('button', { name: 'Send invite' }).click();
-    await toast('is invited');
+    await modal().getByLabel('Username').fill(username);
+    await modal().getByLabel('Password').fill('Test-pass-123');
+    await modal().getByRole('button', { name: 'Add them' }).click();
+    await toast('Added');
+    await current.getByRole('status', { name: 'New login' }).getByText(username, { exact: true }).waitFor();
   };
-  await allow(BLAKE, 'admin'); await allow(OFFICE, 'staff'); await allow(STAFF, 'staff'); await allow(CREW, 'crew'); await allow(NOACCESS, 'staff');
-  check('Invite admin, staff, and crew from the app', (await text()).includes(CREW));
+  await allow(BLAKE, 'admin', 'blake'); await allow(OFFICE, 'staff', 'office'); await allow(STAFF, 'staff', 'staff'); await allow(CREW, 'crew', 'crew'); await allow(NOACCESS, 'staff', 'noaccess');
+  check('Add admin, staff, and crew from the app with a username and password', (await text()).includes(CREW) && (await row(CREW).innerText()).includes('crew'));
   for (const k of ['office', 'staff', 'crew', 'noaccess']) await acceptInvite(k);
-  check('Each person joins from the emailed invite', true);
+  check('Each person signs in with their username and password', (await people.crew.page.locator('main').innerText()).length > 0 && await people.crew.page.locator('.topbar').count() === 1);
   // The bug this guards: someone who never used their invite must still be able to get in later.
   await signInWithLink('blake');
   check('A person who ignored their invite can ask for a new link', (await text()).includes('Today'));
@@ -199,19 +214,25 @@ await step('team allow', async () => {
   await current.reload();
   use('owner');
   await go('/team');
-  await row('removeme@test.local').getByRole('button', { name: 'Remove' }).click();
+  await row('removeme@test.local').getByRole('button', { name: 'Remove', exact: true }).click();
   await toast('Email removed');
   check('Remove an email whose invite was not sent', await row('removeme@test.local').count() === 0);
   const t0 = Date.now();
-  await row('unsent@test.local').getByRole('button', { name: 'Send invite' }).click();
-  await toast('is invited');
-  check('Send an invite that failed earlier', Boolean(await latestLink('unsent@test.local', t0)));
+  void t0;
+  await row('unsent@test.local').getByRole('button', { name: 'Set login' }).click();
+  await modal().getByLabel('Username').fill('unsent');
+  await modal().getByRole('button', { name: 'Save login' }).click();
+  await toast('Login saved');
+  check('Set a login for an allowed email from the Team page', sql(`select count(*) from auth.users where email = 'unsent@test.local';`) === '1');
   await current.reload();
   await ready();
-  check('Sent invites leave the not-sent list', !(await text()).includes('unsent@test.local') || await row('unsent@test.local').getByRole('button', { name: 'Send invite' }).count() === 0);
+  check('People with a login leave the no-login list', await row('unsent@test.local').count() === 1);
   sql(`delete from auth.users where email = 'unsent@test.local'; delete from public.team_invites where email = 'unsent@test.local';`);
   const ownerToken = await tokenOf(people.owner.page);
   check('Inviting an email nobody allowed is refused', (await inviteCall(ownerToken, 'notallowed@test.local')).status === 400);
+  check('Setting a login for an email nobody allowed is refused', (await setLoginCall(ownerToken, 'notallowed@test.local', 'nope')).status === 400);
+  check('A username already in use is refused', (await setLoginCall(ownerToken, BLAKE, 'crew')).status === 400);
+  check('Staff cannot set logins', (await setLoginCall(await tokenOf(people.staff.page), CREW, 'crew2')).status === 403);
   for (const k of ['staff', 'office', 'crew']) {
     const r = await inviteCall(await tokenOf(people[k].page), BLAKE);
     check(`${k} cannot send invites`, r.status === 403, `status ${r.status}`);
@@ -309,13 +330,15 @@ await step('add subs', async () => {
   await modal().getByRole('button', { name: 'Delete this sub' }).click();
   await toast('Sub deleted');
   check('Delete a sub with no work', !(await text()).includes('Temp Delete Me'));
-  const portal = async (name, email) => {
+  const portal = async (name, email, username) => {
     await row(name).getByRole('button', { name: 'Portal access' }).click();
     await modal().getByLabel('Their email').fill(email);
-    await modal().getByRole('button', { name: 'Send invite' }).click();
-    await toast('is invited');
+    await modal().getByLabel('Username').fill(username);
+    await modal().getByLabel('Password').fill('Test-pass-123');
+    await modal().getByRole('button', { name: 'Save login' }).click();
+    await toast('Login saved');
   };
-  await portal('Alpha Framing', SUBA); await portal('Bravo Plumbing', SUBB);
+  await portal('Alpha Framing', SUBA, 'suba'); await portal('Bravo Plumbing', SUBB, 'subb');
   await acceptInvite('subA'); await acceptInvite('subB');
   await people.subA.page.getByRole('heading', { name: 'Alpha Framing' }).waitFor();
   check('Subs join and land on their own portal', true);
@@ -329,7 +352,7 @@ await step('contact privacy', async () => {
   use('office');
   await current.reload(); await go('/subs');
   check('Office person with access sees contacts', (await text()).includes('937-555-0101'));
-  check('Office person cannot open Team', !(await (async () => { await go('/team'); return text(); })()).includes('Invite someone'));
+  check('Office person cannot open Team', !(await (async () => { await go('/team'); return text(); })()).includes('Add someone'));
   for (const k of ['staff', 'crew', 'subA', 'subB']) {
     check(`${k} gets zero contacts from the API`, (await contactsOf(k)).length === 0);
     const put = await rest(k, 'vendor_contacts', { method: 'POST', body: JSON.stringify({ vendor_id: '00000000-0000-0000-0000-000000000000', name: 'x' }) });
@@ -1535,14 +1558,11 @@ await step('webkit', async () => {
   const page = await ctx.newPage();
   page.setDefaultTimeout(15000);
   page.on('pageerror', (e) => pageProblems.push(`safari: ${e.message}`));
-  for (const [who, email, heading] of [['crew', CREW, 'My work'], ['sub', SUBA, 'Alpha Framing']]) {
+  for (const [who, username, heading] of [['crew', 'crew', 'My work'], ['sub', 'suba', 'Alpha Framing']]) {
     await page.goto(BASE);
-    await page.getByLabel('Email').fill(email);
-    await new Promise((r) => setTimeout(r, 1500));
-    const t0 = Date.now();
-    await page.getByRole('button', { name: 'Email me a code' }).click();
-    await page.getByText('Check your email').waitFor();
-    await page.goto(await latestLink(email, t0));
+    await page.getByLabel('Username').fill(username);
+    await page.getByLabel('Password').fill('Test-pass-123');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.getByRole('heading', { name: heading }).waitFor();
     check(`${who} signs in on iPhone Safari`, true);
     const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -1564,7 +1584,7 @@ await step('webkit', async () => {
       check('Sub sends a photo on iPhone', (await rest('owner', 'photos?file_path=ilike.*iphone.png&select=review_status')).json[0]?.review_status === 'pending');
     }
     await page.getByRole('button', { name: 'Sign out' }).first().click();
-    await page.getByRole('button', { name: 'Email me a code' }).waitFor();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).waitFor();
   }
   await wk.close();
 });

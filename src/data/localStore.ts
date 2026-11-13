@@ -123,6 +123,9 @@ export const localStore: Store = {
   async signIn() { return ''; },
   async verifyCode() {},
   async signOut() {},
+  async signInPassword() {},
+  async setLogin() {},
+  async changePassword() {},
   async list(table) {
     return visible(table, (load()[table] ?? []) as never) as never; // older saved demos lack newer tables
   },
