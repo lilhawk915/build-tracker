@@ -116,6 +116,12 @@ describe('making it easy', () => {
     expect(list[0].what).toBe('Call back');
     expect(list[1].what).toBe('Meet Pat Sample at 1:30 PM, 100 Sample Rd');
   });
+  it('shows a meeting once when the next step is the same day', async () => {
+    const { agenda } = await import('../src/domain/leads');
+    const list = agenda([lead({ id: 'meet', next_step: 'Appointment Sunday 1:30', next_date: '2026-11-15' })], [appt({ lead_id: 'meet' })], '2026-11-12');
+    expect(list).toHaveLength(1);
+    expect(list[0].meet).toBe(true);
+  });
 });
 
 describe('Google Calendar link', () => {

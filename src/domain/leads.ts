@@ -159,7 +159,9 @@ export function agenda(leads: Lead[], appts: LeadAppointment[], today: string): 
   for (const l of leads) {
     if (!isOpenLead(l)) continue;
     const due = followUp(l, today);
-    if (due && l.next_date) items.push({ lead: l, date: l.next_date, what: l.next_step || 'Follow up', due, meet: false });
+    // A next step on the same day as a meeting is that meeting. Show it once.
+    const sameDayMeet = appts.some((a) => a.lead_id === l.id && a.appt_date === l.next_date);
+    if (due && l.next_date && !sameDayMeet) items.push({ lead: l, date: l.next_date, what: l.next_step || 'Follow up', due, meet: false });
     for (const a of appts) {
       if (a.lead_id !== l.id || a.appt_date < today || a.appt_date > week) continue;
       items.push({ lead: l, date: a.appt_date + (a.appt_time ? `T${a.appt_time}` : ''), what: `Meet ${l.name}${a.appt_time ? ` at ${timeText(a.appt_time)}` : ''}${a.place ? `, ${a.place}` : ''}`, due: a.appt_date === today ? 'today' : 'week', meet: true });

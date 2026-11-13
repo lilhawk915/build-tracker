@@ -52,7 +52,7 @@ export function LeadsPage() {
         <span className="muted small">{kindLabel(l.kind)}{l.houses > 1 ? ` · ${l.houses} houses` : ''}{l.county ? ` · ${l.county}` : ''}</span>
         {value != null && <span className="small"><b>{money(value)}</b> profit</span>}
         {appt && <span className="small appt">Meet {appointmentText(appt)}</span>}
-        {(l.next_step || l.next_date) && (
+        {(l.next_step || l.next_date) && !(appt && appt.appt_date === l.next_date) && (
           <span className="small">
             {due && <span className={`chip ${FOLLOW_CHIP[due]}`}>{FOLLOW_WORD[due]}</span>} {l.next_step || 'Follow up'}{l.next_date ? ` (${dateText(l.next_date)})` : ''}
           </span>
