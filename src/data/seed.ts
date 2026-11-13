@@ -21,7 +21,7 @@ export function seed(): DB {
   const db: DB = {
     vendors: [], profiles: [], team_invites: [], jobs: [], budget_lines: [], pos: [], bills: [], change_orders: [],
     draws: [], draw_lines: [], lien_waivers: [], tasks: [], daily_logs: [], photos: [], selections: [], documents: [], job_steps: [], scope_items: [], materials: [], notifications: [], vendor_contacts: [], auto_texts: [],
-    estimates: [], estimate_markups: [], estimate_versions: [], expenses: [], invoices: [], leads: [], lead_appointments: [],
+    estimates: [], estimate_markups: [], estimate_versions: [], expenses: [], invoices: [], leads: [], lead_appointments: [], invoice_payments: [],
     catalog_items: seedCatalog().map(catalogToRow),
     company_settings: [{ id: 'main', name: 'Sample Builders', address: '', phone: '', email: '', license: '', logo_data_url: null, default_assumptions: defaultSettings().defaultAssumptions, default_validity_days: 30 }],
     markup_defaults: [{ id: 'main', sales_tax_pct: 0, contingency_pct: 0, overhead_pct: 0, profit_pct: 10 }],
@@ -38,7 +38,7 @@ export function seed(): DB {
   vendor('hvac', 'Sample HVAC', 'HVAC', 'Alex', null);
 
   db.profiles.push(
-    { id: 'demo-admin', email: 'owner@example.com', name: 'Owner', role: 'admin', vendor_id: null },
+    { id: 'demo-admin', email: 'owner@example.com', name: 'Owner', role: 'admin', vendor_id: null, is_owner: true },
     { id: 'demo-sub', email: 'sam@example.com', name: 'Sam (Sample Framing)', role: 'sub', vendor_id: 'framing' },
     { id: 'demo-office', email: 'casey@example.com', name: 'Casey', role: 'staff', vendor_id: null, phone: '', can_view_contacts: true },
     { id: 'demo-staff', email: 'morgan@example.com', name: 'Morgan', role: 'staff', vendor_id: null, phone: '' },

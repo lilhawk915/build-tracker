@@ -54,7 +54,7 @@ function visible<T extends TableName>(table: T, rows: Tables[T][]): Tables[T][] 
   }
   if (p.role === 'staff') {
     if (['vendor_contacts', 'auto_text_settings', 'auto_texts'].includes(table) && !p.can_view_contacts) return [];
-    if (['estimate_markups', 'estimate_versions', 'markup_defaults', 'invoices', 'leads', 'lead_appointments'].includes(table)) return [];
+    if (['estimate_markups', 'estimate_versions', 'markup_defaults', 'invoices', 'leads', 'lead_appointments', 'invoice_payments'].includes(table)) return [];
     if (table === 'profiles' && !p.can_view_contacts) return rows.filter((r) => (r as Profile).role !== 'sub');
     return rows;
   }
@@ -82,6 +82,13 @@ function afterBillChange(db: DB, bill: Bill, before?: Bill) {
 }
 
 function syncCo(db: DB) {
+  // Same as the database: an invoice's paid total adds up from its payments.
+  const pays = db.invoice_payments ?? [];
+  for (const inv of db.invoices ?? []) {
+    const mine = pays.filter((x) => x.invoice_id === inv.id);
+    inv.paid_cents = mine.reduce((sum, x) => sum + Number(x.amount_cents), 0);
+    inv.paid_date = mine.map((x) => x.paid_on).sort().pop() ?? null;
+  }
   for (const p of db.pos) {
     p.approved_co_cents = db.change_orders
       .filter((c: ChangeOrder) => c.po_id === p.id && c.status === 'approved')
@@ -161,6 +168,10 @@ export const localStore: Store = {
         if (!row.appt_date) throw new Error('Pick a date for the appointment.');
         row.appt_time ??= null; row.place ??= ''; row.who ??= ''; row.notes ??= '';
       }
+      if (table === 'invoice_payments') {
+        if (!(Number(row.amount_cents) > 0)) throw new Error('A payment needs an amount above $0.');
+        row.paid_on ??= todayIso(); row.method ??= ''; row.note ??= ''; row.created_at ??= new Date().toISOString();
+      }
       if (table === 'invoices') {
         row.number ??= Math.max(1000, ...db.invoices.map((i) => i.number)) + 1;
         if (db.invoices.some((i) => i.number === row.number)) throw new Error(`Invoice ${row.number} already exists.`);
@@ -236,6 +247,7 @@ export const localStore: Store = {
       }
     }
     if (table === 'leads') db.lead_appointments = (db.lead_appointments ?? []).filter((a) => a.lead_id !== id);
+    if (table === 'invoices') db.invoice_payments = (db.invoice_payments ?? []).filter((x) => x.invoice_id !== id);
     if (table === 'jobs') for (const l of db.leads ?? []) if (l.job_id === id) l.job_id = null;
     rows.splice(i, 1);
     syncCo(db);

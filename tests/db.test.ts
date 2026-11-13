@@ -869,12 +869,48 @@ describe('invoices', () => {
     const [b] = await as<{ number: number }>(ADMIN, `insert into public.invoices (bill_to) values ('Second') returning number`);
     expect(a.number).toBe(1001);
     expect(b.number).toBe(1002);
-    const [p] = await as<{ paid_cents: string }>(ADMIN, `update public.invoices set paid_cents = 755000, paid_date = current_date where id = $1 returning paid_cents`, [a.id]);
-    expect(Number(p.paid_cents)).toBe(755000);
+    // Paid so far adds up from the payments; nobody types it in.
+    await expect(as(ADMIN, `update public.invoices set paid_cents = 755000 where id = $1`, [a.id])).rejects.toThrow(/one at a time/);
+    const [p1] = await as<{ id: string }>(ADMIN, `insert into public.invoice_payments (invoice_id, paid_on, amount_cents, method) values ($1, '2026-11-01', 200000, 'Check') returning id`, [a.id]);
+    await as(ADMIN, `insert into public.invoice_payments (invoice_id, paid_on, amount_cents) values ($1, '2026-11-05', 300000)`, [a.id]);
+    const paid = async () => (await as<{ paid_cents: string; paid_date: string }>(ADMIN, `select paid_cents, paid_date::text from public.invoices where id = $1`, [a.id]))[0];
+    expect(await paid()).toEqual({ paid_cents: 500000, paid_date: '2026-11-05' });
+    await as(ADMIN, `update public.invoice_payments set amount_cents = 255000 where id = $1`, [p1.id]);
+    expect(Number((await paid()).paid_cents)).toBe(555000);
+    await as(ADMIN, `delete from public.invoice_payments where id = $1`, [p1.id]);
+    expect(await paid()).toEqual({ paid_cents: 300000, paid_date: '2026-11-05' });
+  });
+  it('lets only the owner add, change or delete payments and change notes', async () => {
+    const OTHER = '00000000-0000-0000-0000-0000000000f1';
+    await root(`insert into public.team_invites (email, role) values ('partner@x.com', 'admin')`);
+    await root(`insert into auth.users (id, email) values ('${OTHER}', 'partner@x.com')`);
+    const owners = await root(`select id from public.profiles where is_owner`);
+    expect(owners.rows).toEqual([{ id: ADMIN }]);
+    const [inv] = await as<{ id: string }>(ADMIN, `insert into public.invoices (bill_to, notes) values ('Owner test', 'Owner wrote this') returning id`);
+    const [pay] = await as<{ id: string }>(ADMIN, `insert into public.invoice_payments (invoice_id, amount_cents) values ($1, 1000) returning id`, [inv.id]);
+    // The other admin sees them, but can't write them.
+    expect(await as(OTHER, `select id from public.invoice_payments where id = $1`, [pay.id])).toHaveLength(1);
+    await expect(as(OTHER, `insert into public.invoice_payments (invoice_id, amount_cents) values ($1, 500)`, [inv.id])).rejects.toThrow();
+    expect(await as(OTHER, `update public.invoice_payments set amount_cents = 1 where id = $1 returning id`, [pay.id])).toHaveLength(0);
+    expect(await as(OTHER, `delete from public.invoice_payments where id = $1 returning id`, [pay.id])).toHaveLength(0);
+    await expect(as(OTHER, `update public.invoices set notes = 'changed' where id = $1`, [inv.id])).rejects.toThrow(/owner/);
+    await expect(as(OTHER, `delete from public.invoices where id = $1`, [inv.id])).rejects.toThrow(/Only the owner can delete payments/);
+    await expect(as(OTHER, `update public.profiles set is_owner = true where id = $1`, [OTHER])).rejects.toThrow(/owner/);
+    const [made] = await as<{ notes: string; paid_cents: string }>(OTHER, `insert into public.invoices (bill_to, notes, paid_cents) values ('x', 'sneaky', 999) returning notes, paid_cents`);
+    expect(made).toEqual({ notes: '', paid_cents: 0 });
+    // Other invoice edits still work for them.
+    expect(await as(OTHER, `update public.invoices set bill_to = 'New name' where id = $1 returning id`, [inv.id])).toHaveLength(1);
+    // Staff can't even see payments.
+    expect(await as(STAFF, `select id from public.invoice_payments`)).toHaveLength(0);
+    // The owner can.
+    expect(await as(ADMIN, `update public.invoices set notes = '' where id = $1 returning id`, [inv.id])).toHaveLength(1);
+    expect(await as(ADMIN, `delete from public.invoices where id = $1 returning id`, [inv.id])).toHaveLength(1);
+    expect((await root(`select count(*)::int n from public.invoice_payments where id = $1`, [pay.id])).rows).toEqual([{ n: 0 }]);
   });
   it('refuses two invoices with the same number, a negative payment, and lines that are not a list', async () => {
     await expect(as(ADMIN, `insert into public.invoices (number) values (1001)`)).rejects.toThrow();
-    await expect(as(ADMIN, `insert into public.invoices (paid_cents) values (-1)`)).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.invoice_payments (invoice_id, amount_cents) select id, -1 from public.invoices limit 1`)).rejects.toThrow();
+    await expect(as(ADMIN, `insert into public.invoice_payments (invoice_id, amount_cents) select id, 0 from public.invoices limit 1`)).rejects.toThrow();
     await expect(as(ADMIN, `insert into public.invoices (lines) values ('{}')`)).rejects.toThrow();
   });
   it('keeps invoices from staff, subs, no-access logins, and visitors', async () => {

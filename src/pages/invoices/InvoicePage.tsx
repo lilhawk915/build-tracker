@@ -2,12 +2,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { store, useData } from '../../data';
 import { money } from '../../domain/csv';
 import { invoiceBalance, invoiceTotal } from '../../domain/invoice';
-import { todayIso } from '../../domain/rules';
 import type { Invoice, InvoiceLine } from '../../domain/types';
 import { safeFileName } from '../../data/store';
 import { NumberCell, TextBlock, TextCell, downloadFile, invoiceFileName, useEstimating, useInvoicePdf } from '../../estimator/ui';
 import { statusChip } from './InvoicesPage';
 import { KIND_WORD } from '../estimates/QuoteToInvoice';
+import { InvoiceNotes, Payments } from './Payments';
 
 const TERMS = ['Due on receipt', 'Net 7', 'Net 15', 'Net 30'];
 
@@ -113,19 +113,9 @@ export function InvoicePage() {
         <button className="btn" onClick={() => setLines([...inv.lines, { description: 'New line', detail: '', amount_cents: 0 }])}>Add a line</button>
       </section>
 
-      <section className="panel" aria-label="Payments">
-        <h3>Payments</h3>
-        <div className="inrow"><span>Paid so far ($)</span><NumberCell className="field num" label="Paid so far" value={Number(inv.paid_cents) / 100} onCommit={(v) => set({ paid_cents: Math.round((v ?? 0) * 100), paid_date: inv.paid_date ?? todayIso() }, 'Payment saved.')} /></div>
-        <div className="inrow"><span>Last payment date</span><TextCell className="field" type="date" label="Last payment date" value={inv.paid_date ?? ''} onCommit={(v) => set({ paid_date: v || null })} /></div>
-        <dl className="figs strip">
-          <div><dt>Total</dt><dd>{money(total)}</dd></div>
-          <div><dt>Paid</dt><dd>{money(Number(inv.paid_cents))}</dd></div>
-          <div><dt>Balance due</dt><dd>{money(balance)}</dd></div>
-        </dl>
-        {balance > 0 && <button className="btn primary" onClick={() => set({ paid_cents: total, paid_date: todayIso() }, `Invoice ${inv.number} marked paid in full.`)}>Mark paid in full</button>}
-      </section>
+      <Payments inv={inv} total={total} balance={balance} />
 
-      <label className="field">Notes on the invoice<TextBlock label="Invoice notes" rows={3} value={inv.notes} onCommit={(v) => set({ notes: v })} /></label>
+      <InvoiceNotes inv={inv} />
       {!company.name && <div className="alert warn">Your company name is blank, so the PDF has no header. Fill it in under Estimates → Quote settings.</div>}
 
       <p className="muted small">

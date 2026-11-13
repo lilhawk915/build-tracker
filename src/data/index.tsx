@@ -14,7 +14,7 @@ export type Data = { [K in keyof Tables]: Tables[K][] } & { subJobs: SubJob[]; m
 
 const EMPTY: Data = {
   vendors: [], profiles: [], team_invites: [], jobs: [], budget_lines: [], pos: [], bills: [], change_orders: [],
-  draws: [], draw_lines: [], lien_waivers: [], tasks: [], daily_logs: [], photos: [], selections: [], documents: [], job_steps: [], scope_items: [], materials: [], notifications: [], vendor_contacts: [], auto_text_settings: [], auto_texts: [], estimates: [], estimate_markups: [], estimate_versions: [], catalog_items: [], company_settings: [], markup_defaults: [], expenses: [], invoices: [], leads: [], lead_appointments: [], subJobs: [], myRequests: [],
+  draws: [], draw_lines: [], lien_waivers: [], tasks: [], daily_logs: [], photos: [], selections: [], documents: [], job_steps: [], scope_items: [], materials: [], notifications: [], vendor_contacts: [], auto_text_settings: [], auto_texts: [], estimates: [], estimate_markups: [], estimate_versions: [], catalog_items: [], company_settings: [], markup_defaults: [], expenses: [], invoices: [], leads: [], lead_appointments: [], invoice_payments: [], subJobs: [], myRequests: [],
 };
 
 interface Ctx {
@@ -50,7 +50,7 @@ export function DataProvider({ me, children }: { me: Profile; children: ReactNod
       const crew = me.role === 'crew';
       const admin = me.role === 'admin';
       const contacts = canSeeContacts(me);
-      const [vendors, profiles, team_invites, jobs, budget_lines, pos, bills, change_orders, draws, draw_lines, lien_waivers, tasks, daily_logs, photos, selections, documents, job_steps, scope_items, materials, notifications, vendor_contacts, auto_text_settings, auto_texts, estimates, estimate_markups, estimate_versions, catalog_items, company_settings, markup_defaults, expenses, invoices, leads, lead_appointments, subJobs, myRequests] =
+      const [vendors, profiles, team_invites, jobs, budget_lines, pos, bills, change_orders, draws, draw_lines, lien_waivers, tasks, daily_logs, photos, selections, documents, job_steps, scope_items, materials, notifications, vendor_contacts, auto_text_settings, auto_texts, estimates, estimate_markups, estimate_versions, catalog_items, company_settings, markup_defaults, expenses, invoices, leads, lead_appointments, invoice_payments, subJobs, myRequests] =
         await Promise.all([
           store.list('vendors'),
           store.list('profiles'),
@@ -85,11 +85,12 @@ export function DataProvider({ me, children }: { me: Profile; children: ReactNod
           admin ? store.list('invoices') : Promise.resolve([]),
           admin ? store.list('leads') : Promise.resolve([]),
           admin ? store.list('lead_appointments') : Promise.resolve([]),
+          admin ? store.list('invoice_payments') : Promise.resolve([]),
           staff ? Promise.resolve([]) : store.myJobs(),
           me.role === 'sub' ? store.myMaterialRequests() : Promise.resolve([]),
         ]);
-      rememberRows({ vendors, team_invites, jobs, budget_lines, pos, bills, change_orders, draws, draw_lines, lien_waivers, tasks, daily_logs, photos, selections, documents, job_steps, scope_items, materials, notifications, vendor_contacts, auto_text_settings, estimates, estimate_markups, catalog_items, company_settings, markup_defaults, expenses, invoices, leads, lead_appointments } as never);
-      setData({ vendors, profiles, team_invites, jobs, budget_lines, pos, bills, change_orders, draws, draw_lines, lien_waivers, tasks, daily_logs, photos, selections, documents, job_steps, scope_items, materials, notifications, vendor_contacts, auto_text_settings, auto_texts, estimates, estimate_markups, estimate_versions, catalog_items, company_settings, markup_defaults, expenses, invoices, leads, lead_appointments, subJobs, myRequests });
+      rememberRows({ vendors, team_invites, jobs, budget_lines, pos, bills, change_orders, draws, draw_lines, lien_waivers, tasks, daily_logs, photos, selections, documents, job_steps, scope_items, materials, notifications, vendor_contacts, auto_text_settings, estimates, estimate_markups, catalog_items, company_settings, markup_defaults, expenses, invoices, leads, lead_appointments, invoice_payments } as never);
+      setData({ vendors, profiles, team_invites, jobs, budget_lines, pos, bills, change_orders, draws, draw_lines, lien_waivers, tasks, daily_logs, photos, selections, documents, job_steps, scope_items, materials, notifications, vendor_contacts, auto_text_settings, auto_texts, estimates, estimate_markups, estimate_versions, catalog_items, company_settings, markup_defaults, expenses, invoices, leads, lead_appointments, invoice_payments, subJobs, myRequests });
       setLoadError('');
     } catch (e) {
       setLoadError((e as Error).message);

@@ -58,7 +58,7 @@ export interface MaterialRequest {
   id: string; job_id: string; name: string; quantity: string; status: MaterialStatus; needed_by: string | null;
   expected_date: string | null; arrived_date: string | null; notes: string;
 }
-export interface Profile { id: string; email: string; name: string; role: Role; vendor_id: string | null; phone?: string; can_view_contacts?: boolean; username?: string | null }
+export interface Profile { id: string; email: string; name: string; role: Role; vendor_id: string | null; phone?: string; can_view_contacts?: boolean; username?: string | null; is_owner?: boolean }
 export interface Invite { email: string; role: Exclude<Role, 'none'>; vendor_id: string | null }
 export interface Job {
   id: string; name: string; address: string; job_type: JobType; status: JobStatus;
@@ -143,6 +143,11 @@ export interface Invoice {
   paid_date: string | null; notes: string; created_at: string; kind: InvoiceKind;
 }
 
+/** One payment on an invoice. Only the owner adds, changes or deletes them. */
+export interface InvoicePayment {
+  id: string; invoice_id: string; paid_on: string; amount_cents: number; method: string; note: string; created_at: string;
+}
+
 export type LeadKind = 'custom_home' | 'investor' | 'development' | 'multi_family' | 'remodel' | 'other';
 export type LeadStage = 'new' | 'appointment' | 'met' | 'waiting' | 'quoted' | 'won' | 'lost';
 export interface LeadLogEntry { at: string; text: string }
@@ -165,7 +170,7 @@ export interface Tables {
   auto_text_settings: AutoTextSettings; auto_texts: AutoTextLog;
   estimates: EstimateRow; estimate_markups: MarkupsRow; estimate_versions: EstimateVersionRow; catalog_items: CatalogRow;
   company_settings: CompanyRow & { id: string }; markup_defaults: MarkupDefaultsRow & { id: string }; expenses: Expense;
-  invoices: Invoice; leads: Lead; lead_appointments: LeadAppointment;
+  invoices: Invoice; leads: Lead; lead_appointments: LeadAppointment; invoice_payments: InvoicePayment;
 }
 export type TableName = keyof Tables;
 

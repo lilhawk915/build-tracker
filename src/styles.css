@@ -310,3 +310,13 @@ ul.plain { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
   .contactbtns .btn { flex: 1; justify-content: center; }
   .stagebar .btn.lostbtn { margin-left: 0; }
 }
+
+/* Invoice payments */
+table.payments input, table.payments select { width: 100%; min-width: 0; }
+table.payments td:first-child { min-width: 140px; }
+table.payments td:nth-child(2) { width: 120px; }
+table.payments tr.unsaved td { background: var(--amber-soft); }
+.addpay { display: grid; gap: 8px; }
+.addpay .row { flex-wrap: wrap; align-items: end; }
+.addpay .field { flex: 1 1 140px; }
+.addpay .field.grow { flex: 3 1 200px; }
