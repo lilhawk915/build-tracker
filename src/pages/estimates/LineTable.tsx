@@ -1,7 +1,7 @@
 import { NumberCell, TextBlock, TextCell, qtyText, usd } from '../../estimator/ui';
 import { editsForAmount, type AmountField } from '../../estimator/domain/pricing/pricing';
 import { applyLineEdit, familyOf, type PricedProject } from '../../estimator/domain/pricing/resolve';
-import { DIVISIONS, GRADES, UNITS, type CatalogItem, type Division, type Grade, type LineEdit, type Project, type ResolvedLine, type Unit } from '../../estimator/domain/types';
+import { DIVISIONS, GRADES, UNITS, type CatalogItem, type Division, type Grade, type LineEdit, type LineTag, type Project, type ResolvedLine, type Unit } from '../../estimator/domain/types';
 
 type Update = (change: (p: Project) => Project) => void;
 
@@ -43,7 +43,7 @@ function LineRow({ line, update, catalog }: { line: ResolvedLine; update: Update
   const swaps = new Map(catalog.filter((c) => c.division === line.division && familyOf(c.id) !== familyOf(line.catalogItemId ?? '')).map((c) => [familyOf(c.id), c]));
 
   return (
-    <tr>
+    <tr className={line.tag === 'not_included' ? 'notincluded' : ''}>
       <td>
         <div className="row nowrap" style={{ gap: 4 }}>
           <TextCell label={`Name of ${line.name}`} value={line.name} edited={line.edited.name} onCommit={(name) => edit({ name: name.trim() || undefined })} />
@@ -54,6 +54,20 @@ function LineRow({ line, update, catalog }: { line: ResolvedLine; update: Update
         </div>
         {custom && (
           <span className="linedesc"><TextBlock label={`Description of ${line.name}`} rows={line.description ? Math.min(8, line.description.split('\n').length + 1) : 1} value={line.description ?? ''} onCommit={(description) => setCustom({ description })} placeholder="+ Description for the client" /></span>
+        )}
+        {custom && (
+          <span className="row nowrap linetag">
+            <select aria-label={`How ${line.name} shows on the quote`} value={line.tag ?? ''} onChange={(e) => setCustom({ tag: (e.target.value || undefined) as LineTag | undefined, ...(e.target.value === 'not_included' ? {} : { clientPrice: null }) })}>
+              <option value="">Counts in the total</option>
+              <option value="optional">Optional (counts, tagged "Optional")</option>
+              <option value="not_included">Not included (shown, not counted)</option>
+            </select>
+            {line.tag === 'not_included' && (
+              <label className="row nowrap small">Client price $
+                <NumberCell label={`Client price of ${line.name}`} value={line.clientPrice ?? null} nullable placeholder="optional" decimals={2} onCommit={(v) => setCustom({ clientPrice: v })} />
+              </label>
+            )}
+          </span>
         )}
       </td>
       <td>

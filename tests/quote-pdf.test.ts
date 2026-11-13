@@ -32,3 +32,32 @@ describe('client quote PDF for a custom job', () => {
     if (process.env.QUOTE_PDF_OUT) writeFileSync(process.env.QUOTE_PDF_OUT, bytes);
   }, 30000);
 });
+
+describe('optional and not-included lines', () => {
+  const project = () => rowsToProject({
+    kind: 'custom', status: 'draft', client_name: 'Sample Client', address: '100 Sample Rd', quote_date: '2026-11-13', notes: '', inputs: {},
+    line_edits: { a: { laborUnit: 4600, materialUnit: 0 }, b: { laborUnit: 3200, materialUnit: 0 }, c: { laborUnit: 6400, materialUnit: 0 } },
+    custom_lines: [
+      { key: 'a', qty: 1, name: 'Open cell spray foam', unit: 'lump sum', division: 'Insulation/Drywall', catalogItemId: null, tag: 'optional', description: 'Install 3.5" open cell spray foam in all exterior walls.' },
+      { key: 'b', qty: 1, name: 'Fiberglass batt insulation', unit: 'lump sum', division: 'Insulation/Drywall', catalogItemId: null, tag: 'not_included', clientPrice: 4580, description: 'Install R-13 fiberglass batts in all exterior walls.' },
+      { key: 'c', qty: 1, name: 'Blown-in cellulose', unit: 'lump sum', division: 'Insulation/Drywall', catalogItemId: null, description: 'Install 12" of blown-in cellulose (R-38) in the attic.' },
+    ],
+    assumptions: '', validity_days: 30, job_id: null, deposit_pct: 0, number: 1005,
+  } as never, { estimate_id: 'x', sales_tax_pct: 0, contingency_pct: 0, overhead_pct: 0, profit_pct: 0, profit_amount: 3300 } as never);
+  const settings = () => rowsToSettings({ name: 'Sample Builders', address: '', phone: '', email: '', license: '', logo_data_url: null, default_assumptions: '', default_validity_days: 30 } as never, null);
+
+  it('leaves a not-included line out of the cost and the total', async () => {
+    const { priceProject } = await import('../src/estimator/domain/pricing/resolve');
+    const p = priceProject(project(), [], settings());
+    expect(p.totals.subtotal).toBe(11000);
+    expect(p.totals.grandTotal).toBe(14300);
+    expect(p.counted.map((l) => l.key)).toEqual(['a', 'c']);
+    expect(p.lines).toHaveLength(3);
+  });
+  it('prints the optional tag and the greyed not-included line', async () => {
+    const blob = await renderQuotePdf({ mode: 'client', project: project(), catalog: [], settings: settings() });
+    const bytes = Buffer.from(await blob.arrayBuffer());
+    expect(bytes.subarray(0, 4).toString()).toBe('%PDF');
+    if (process.env.QUOTE_PDF_OUT) writeFileSync(process.env.QUOTE_PDF_OUT.replace('.pdf', '-tags.pdf'), bytes);
+  }, 30000);
+});

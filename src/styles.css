@@ -324,3 +324,8 @@ table.payments tr.unsaved td { background: var(--amber-soft); }
 /* A custom line's client description, under its name */
 .linedesc { display: block; margin-top: 4px; min-width: 260px; }
 .linedesc textarea { min-height: 0; font-size: 14px; padding: 6px 8px; }
+.linetag { margin-top: 4px; gap: 6px; }
+.linetag select { width: auto; min-height: 0; padding: 4px 6px; font-size: 13px; }
+.linetag .cell { width: 100px; }
+tr.notincluded td { opacity: .55; }
+tr.notincluded td:first-child { opacity: 1; }

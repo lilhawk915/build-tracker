@@ -147,6 +147,8 @@ export function resolveEstimate(
       idx,
     );
     line.description = c.description ?? '';
+    line.tag = c.tag;
+    line.clientPrice = c.clientPrice ?? null;
     lines.push(line);
   }
 
@@ -194,10 +196,12 @@ export function priceProject(project: Project, catalog: CatalogItem[], settings:
   const markups = markupsOf(project, settings);
   const isHouse = project.kind === 'house';
   const { lines, removed } = resolveEstimate(project.inputs, catalog, project.lineEdits, project.customLines, isHouse);
-  const totals = computeTotals(lines, markups, isHouse ? project.inputs.heatedSqft : 0);
-  const divisions = summarizeDivisions(lines, markups, totals.grandTotal);
+  // A "not included" line is shown to the client for comparison, but is not part of the price.
+  const counted = lines.filter((l) => l.tag !== 'not_included');
+  const totals = computeTotals(counted, markups, isHouse ? project.inputs.heatedSqft : 0);
+  const divisions = summarizeDivisions(counted, markups, totals.grandTotal);
   const unverifiedCount = lines.filter((l) => l.unverified).length;
-  return { lines, removed, totals, divisions, unverifiedCount, markups };
+  return { lines, counted, removed, totals, divisions, unverifiedCount, markups };
 }
 
 export type PricedProject = ReturnType<typeof priceProject>;

@@ -59,7 +59,7 @@ export function QuoteToInvoice({ row, project, priced, onStatus, acceptNow, onAc
     }), done);
     if (ok) nav(`/invoices/${id}`);
   };
-  const quoteLines = () => linesFromQuote(title, priced.divisions, priced.lines, priced.totals.grandTotal);
+  const quoteLines = () => linesFromQuote(title, priced.divisions, priced.counted, priced.totals.grandTotal);
   const makeDeposit = () => makeInvoice('deposit', depositLines(title, project.quoteNumber, totalCents, depositPct), 'Deposit invoice made. Send it with the signed quote.');
   const makeFinal = () => {
     if (depositDue && !window.confirm('The deposit is not marked paid yet, so it will not be taken off the final invoice. Make the final invoice anyway?')) return;

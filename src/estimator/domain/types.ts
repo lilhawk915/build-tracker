@@ -137,6 +137,10 @@ export interface CustomLine {
   catalogItemId: string | null;
   /** What the line covers, in as many lines as needed. Shows on the client quote under Description. */
   description?: string;
+  /** optional: counted, but tagged "Optional" for the client. not_included: shown greyed out with its price, not counted in the total. */
+  tag?: LineTag;
+  /** A not-included line's price to the client. Blank means its cost with the quote's markup. */
+  clientPrice?: number | null;
 }
 
 /** custom: only the lines you add. house: lines generated from the house inputs. */
@@ -282,7 +286,11 @@ export interface ResolvedLine {
   warnings: string[];
   /** A custom line's description, shown on the client quote. */
   description?: string;
+  tag?: LineTag;
+  clientPrice?: number | null;
 }
+
+export type LineTag = 'optional' | 'not_included';
 
 export interface Totals {
   material: number;
