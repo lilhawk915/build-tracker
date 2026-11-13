@@ -146,6 +146,7 @@ export function resolveEstimate(
       edit,
       idx,
     );
+    line.description = c.description ?? '';
     lines.push(line);
   }
 

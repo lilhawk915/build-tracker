@@ -1,12 +1,15 @@
 import { Buffer } from 'buffer';
-import { Document, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer';
+import { Document, Font, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer';
 import { validUntil } from './domain/house/defaults';
+import { clientLineAmounts } from './domain/pricing/pricing';
 import { priceProject } from './domain/pricing/resolve';
 import { DIVISIONS, type CatalogItem, type Project, type Settings } from './domain/types';
 export type QuoteMode = 'client' | 'internal';
 
 // The PDF library expects Node's Buffer when reading images. Without it, logos are silently dropped.
 (globalThis as unknown as { Buffer: typeof Buffer }).Buffer ??= Buffer;
+// Whole words only: no "encapsula-tion" breaks.
+Font.registerHyphenationCallback((word) => [word]);
 
 const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const pct = (n: number) => `${Math.round(n * 100) / 100}%`;
@@ -35,8 +38,19 @@ const s = StyleSheet.create({
   sectionTitle: { fontFamily: 'Helvetica-Bold', fontSize: 10.5, marginTop: 14, marginBottom: 4 },
   sigRow: { flexDirection: 'row', gap: 20, marginTop: 26 },
   sigBlock: { flex: 1 },
+  qbox: { width: 230, backgroundColor: '#f1f5f9' },
+  qboxTitle: { backgroundColor: '#475569', color: 'white', fontFamily: 'Helvetica-Bold', fontSize: 15, paddingVertical: 6, paddingHorizontal: 8 },
+  qboxRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, paddingHorizontal: 8 },
+  qboxTotal: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, paddingHorizontal: 8, backgroundColor: '#475569', color: 'white', fontFamily: 'Helvetica-Bold', fontSize: 12 },
+  itemRow: { flexDirection: 'row', paddingVertical: 7, paddingHorizontal: 4, borderBottomWidth: 0.5, borderBottomColor: '#cbd5e1' },
+  totalBox: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 8, borderTopWidth: 2, borderTopColor: '#cbd5e1', paddingTop: 8 },
+  totalBoxAmt: { borderWidth: 0.75, borderColor: '#94a3b8', paddingVertical: 4, paddingHorizontal: 10, minWidth: 110, textAlign: 'right', fontFamily: 'Helvetica-Bold', fontSize: 12 },
   sigLine: { borderBottomWidth: 0.75, borderBottomColor: '#1e293b', height: 22 },
 });
+
+// Client quote for a custom job: one row per item, with its description, like a contractor's estimate.
+const IC = { item: { width: 120, paddingRight: 8 }, desc: { flex: 1, paddingRight: 8 }, q: { width: 32 }, p: { width: 70 }, t: { width: 72 } };
+const longDate = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : iso);
 
 const COL = { item: { flex: 1 }, q: { width: 44 }, unit: { width: 46 }, m: { width: 58 }, l: { width: 58 }, mt: { width: 62 }, lt: { width: 62 }, t: { width: 66 } };
 
@@ -54,6 +68,7 @@ function QuoteDocument({ mode, project, catalog, settings, versionLabel }: Quote
   const through = validUntil(project.date, project.validityDays);
   const depositPct = project.depositPct ?? 0;
   const deposit = Math.round(totals.grandTotal * depositPct) / 100;
+  const clientAmounts = clientLineAmounts(lines, m, totals.grandTotal);
   const contact = [c.address, c.phone, c.email, c.license ? `License: ${c.license}` : ''].filter(Boolean);
 
   return (
@@ -77,13 +92,23 @@ function QuoteDocument({ mode, project, catalog, settings, versionLabel }: Quote
               <Text key={line}>{line}</Text>
             ))}
           </View>
+          {mode === 'client' ? (
+            <View style={s.qbox}>
+              <Text style={s.qboxTitle}>{project.quoteNumber ? `Quote #${project.quoteNumber}` : 'Quote'}</Text>
+              {project.date ? <View style={s.qboxRow}><Text>Date</Text><Text>{longDate(project.date)}</Text></View> : null}
+              {through ? <View style={s.qboxRow}><Text>Good through</Text><Text>{longDate(through)}</Text></View> : null}
+              {versionLabel ? <View style={s.qboxRow}><Text>Version</Text><Text>{versionLabel}</Text></View> : null}
+              <View style={s.qboxTotal}><Text>Total</Text><Text>{usd(totals.grandTotal)}</Text></View>
+            </View>
+          ) : (
           <View>
-            <Text style={s.title}>{mode === 'internal' ? 'Internal Estimate' : 'Quote'}</Text>
+            <Text style={s.title}>Internal Estimate</Text>
             {project.quoteNumber ? <Text style={[s.meta, s.bold]}>Quote #{project.quoteNumber}</Text> : null}
             {project.date && <Text style={s.meta}>Date: {project.date}</Text>}
             {through && <Text style={s.meta}>Valid through: {through}</Text>}
             {versionLabel && <Text style={s.meta}>Version: {versionLabel}</Text>}
           </View>
+          )}
         </View>
 
         <View style={s.info}>
@@ -109,7 +134,36 @@ function QuoteDocument({ mode, project, catalog, settings, versionLabel }: Quote
           </View>
         )}
 
-        {mode === 'client' ? (
+        {mode === 'client' && project.kind === 'custom' ? (
+          <View>
+            <View style={s.tableHead} fixed>
+              <Text style={IC.item}>Product/Service</Text>
+              <Text style={IC.desc}>Description</Text>
+              <Text style={[IC.q, s.right]}>Qty.</Text>
+              <Text style={[IC.p, s.right]}>Unit price</Text>
+              <Text style={[IC.t, s.right]}>Total</Text>
+            </View>
+            {lines.map((l, n) => {
+              const amount = clientAmounts[n];
+              const paras = (l.description ?? '').split(/\n\s*\n|\n/).map((x) => x.trim()).filter(Boolean);
+              return (
+                <View style={s.itemRow} key={l.key} wrap={paras.length > 12}>
+                  <Text style={[IC.item, s.bold]}>{l.name}</Text>
+                  <View style={IC.desc}>
+                    {paras.map((x, i) => <Text key={i} style={{ marginBottom: i === paras.length - 1 ? 0 : 5 }}>{x}</Text>)}
+                  </View>
+                  <Text style={[IC.q, s.right]}>{qty(l.qty)}</Text>
+                  <Text style={[IC.p, s.right]}>{amount > 0 && l.qty > 0 ? usd(amount / l.qty) : ''}</Text>
+                  <Text style={[IC.t, s.right]}>{amount > 0 ? usd(amount) : 'Included'}</Text>
+                </View>
+              );
+            })}
+            <View style={s.totalBox} wrap={false}>
+              <Text style={{ marginRight: 14, fontFamily: 'Helvetica-Bold', fontSize: 11 }}>Total</Text>
+              <Text style={s.totalBoxAmt}>{usd(totals.grandTotal)}</Text>
+            </View>
+          </View>
+        ) : mode === 'client' ? (
           <View>
             <View style={s.tableHead} fixed>
               <Text style={{ flex: 1 }}>{project.kind === 'custom' ? 'Scope of work' : 'Division'}</Text>
@@ -244,7 +298,7 @@ function QuoteDocument({ mode, project, catalog, settings, versionLabel }: Quote
           <Text>
             By signing below, the client accepts this quote and its terms. The signed quote is the agreement for this work.
           </Text>
-          {through ? <Text>This quote is good through {through}, because material prices change.</Text> : null}
+          {through ? <Text>This quote is good through {longDate(through)}, because material prices change.</Text> : null}
           <Text>Any change to this scope needs a signed change order, with its price, before that work is done.</Text>
           <View style={s.sigRow}>
             <View style={s.sigBlock}>

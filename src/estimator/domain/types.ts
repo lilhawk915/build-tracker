@@ -135,6 +135,8 @@ export interface CustomLine {
   unit: Unit;
   qty: number;
   catalogItemId: string | null;
+  /** What the line covers, in as many lines as needed. Shows on the client quote under Description. */
+  description?: string;
 }
 
 /** custom: only the lines you add. house: lines generated from the house inputs. */
@@ -278,6 +280,8 @@ export interface ResolvedLine {
   };
   unverified: boolean;
   warnings: string[];
+  /** A custom line's description, shown on the client quote. */
+  description?: string;
 }
 
 export interface Totals {

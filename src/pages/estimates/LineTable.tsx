@@ -1,4 +1,4 @@
-import { NumberCell, TextCell, qtyText, usd } from '../../estimator/ui';
+import { NumberCell, TextBlock, TextCell, qtyText, usd } from '../../estimator/ui';
 import { editsForAmount, type AmountField } from '../../estimator/domain/pricing/pricing';
 import { applyLineEdit, familyOf, type PricedProject } from '../../estimator/domain/pricing/resolve';
 import { DIVISIONS, GRADES, UNITS, type CatalogItem, type Division, type Grade, type LineEdit, type Project, type ResolvedLine, type Unit } from '../../estimator/domain/types';
@@ -52,6 +52,9 @@ function LineRow({ line, update, catalog }: { line: ResolvedLine; update: Update
           {custom && <span className="chip">custom</span>}
           {line.warnings.map((w) => <span key={w} className="flag" title={w}>!</span>)}
         </div>
+        {custom && (
+          <span className="linedesc"><TextBlock label={`Description of ${line.name}`} rows={line.description ? Math.min(8, line.description.split('\n').length + 1) : 1} value={line.description ?? ''} onCommit={(description) => setCustom({ description })} placeholder="+ Description for the client" /></span>
+        )}
       </td>
       <td>
         {line.hasGrades ? (

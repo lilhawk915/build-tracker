@@ -79,10 +79,10 @@ export function TextCell({ value, onCommit, label, edited, className = 'cell', t
   );
 }
 
-export function TextBlock({ value, onCommit, label, rows = 6 }: { value: string; onCommit: (v: string) => void; label: string; rows?: number }) {
+export function TextBlock({ value, onCommit, label, rows = 6, placeholder }: { value: string; onCommit: (v: string) => void; label: string; rows?: number; placeholder?: string }) {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
-  return <textarea aria-label={label} rows={rows} value={text} onChange={(e) => setText(e.target.value)} onBlur={() => { if (text !== value) onCommit(text); }} />;
+  return <textarea aria-label={label} rows={rows} placeholder={placeholder} value={text} onChange={(e) => setText(e.target.value)} onBlur={() => { if (text !== value) onCommit(text); }} />;
 }
 
 /** The live catalog and settings, in the Estimator's own shapes. Staff get settings with no markups. */

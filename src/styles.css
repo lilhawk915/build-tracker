@@ -320,3 +320,7 @@ table.payments tr.unsaved td { background: var(--amber-soft); }
 .addpay .row { flex-wrap: wrap; align-items: end; }
 .addpay .field { flex: 1 1 140px; }
 .addpay .field.grow { flex: 3 1 200px; }
+
+/* A custom line's client description, under its name */
+.linedesc { display: block; margin-top: 4px; min-width: 260px; }
+.linedesc textarea { min-height: 0; font-size: 14px; padding: 6px 8px; }

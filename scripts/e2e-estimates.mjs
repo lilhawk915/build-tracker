@@ -117,6 +117,11 @@ await step('custom estimate', admin, async () => {
   await admin.waitForTimeout(1200);
   const grand = await admin.locator('.mkrow.strong').innerText();
   check('Typed amounts and a flat $4,900 profit total $9,800', grand.includes('$9,800.00'), grand.replace(/\s+/g, ' '));
+  const descBox = admin.getByLabel('Description of Concrete, all pads and step', { exact: true });
+  await descBox.fill('Gravel base, forms and rebar.\nPour and finish all pads.');
+  await descBox.blur();
+  await settle(admin);
+  check('A line description is saved for the client quote', sql(`select l->>'description' from public.estimates, jsonb_array_elements(custom_lines) l where id = '${estId}' and l->>'description' <> '';`) === 'Gravel base, forms and rebar.\nPour and finish all pads.');
   await admin.screenshot({ path: `${out}/est-01-custom.png`, fullPage: true });
   await admin.reload();
   await admin.getByRole('heading', { name: 'Profit and markups' }).waitFor();

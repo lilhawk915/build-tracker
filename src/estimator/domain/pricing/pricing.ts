@@ -85,6 +85,32 @@ export function summarizeDivisions(
   }));
 }
 
+/**
+ * Each line's price to the client: tax and markups rolled in, split by the line's taxed cost, so the
+ * lines always add up to the grand total exactly. A line with no cost on it comes to $0 ("Included").
+ */
+export function clientLineAmounts(
+  lines: Pick<ResolvedLine, 'material' | 'labor'>[],
+  settings: Pick<Markups, 'salesTaxPct'>,
+  grandTotal: number,
+): number[] {
+  const weights = lines.map((l) => Math.max(0, l.material * (1 + settings.salesTaxPct / 100) + l.labor));
+  const totalWeight = weights.reduce((s, w) => s + w, 0);
+  const targetCents = toCents(grandTotal);
+  const shares = weights.map((w) => {
+    const exact = totalWeight > 0 ? (w / totalWeight) * targetCents : 0;
+    return { floor: Math.floor(exact), remainder: exact - Math.floor(exact) };
+  });
+  let left = targetCents - shares.reduce((s, x) => s + x.floor, 0);
+  const order = shares.map((x, n) => ({ n, remainder: x.remainder })).filter((_, n) => weights[n] > 0).sort((a, b) => b.remainder - a.remainder);
+  for (const { n } of order) {
+    if (left <= 0) break;
+    shares[n].floor += 1;
+    left -= 1;
+  }
+  return shares.map((x) => x.floor / 100);
+}
+
 export type AmountField = 'material' | 'labor' | 'total';
 
 /**
