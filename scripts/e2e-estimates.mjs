@@ -168,6 +168,7 @@ await step('staff view', staff, async () => {
   await staff.getByRole('heading', { name: 'Estimates' }).waitFor();
   let t = await staff.locator('main').innerText();
   check('Staff see the estimate at cost: $4,900, not $9,800', t.includes('Sample Rd - Concrete') && t.includes('$4,900.00') && !t.includes('$9,800'));
+  check('Staff see no projected profit on the list', !t.includes('Projected profit') && !t.includes('projected profit'));
   await staff.getByRole('link', { name: 'Sample Rd - Concrete' }).click();
   await staff.getByText('You see costs only').waitFor();
   t = await staff.locator('main').innerText();
@@ -197,6 +198,9 @@ await step('starter catalog', admin, async () => {
 
 await step('house estimate', admin, async () => {
   await admin.goto(`${BASE}/estimates`);
+  await admin.locator('dl[aria-label="Projected profit"]').waitFor();
+  const pp = await admin.locator('dl[aria-label="Projected profit"]').innerText();
+  check('Admins see projected profit on the list: $4,900 waiting on the client', pp.includes('Projected profit, waiting on client (1)') && pp.includes('$4,900.00'));
   await admin.getByRole('button', { name: 'New estimate' }).click();
   await admin.getByRole('dialog').getByLabel('Client or job name').fill('Sample house');
   await admin.getByRole('dialog').getByLabel('Type').selectOption('house');

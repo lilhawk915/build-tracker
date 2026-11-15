@@ -28,6 +28,11 @@ export function EstimatesPage() {
   const shown = rows.filter(({ e, priced }) => (!show || e.status === show) && words.every((w) =>
     [e.client_name, e.address, e.notes, e.assumptions, ...priced.lines.map((l) => l.name)].join(' ').toLowerCase().includes(w)));
 
+  // Profit you could still make (draft or sent) and profit already won. Not-accepted quotes count for nothing.
+  const sum = (st: string[]) => rows.filter(({ e }) => st.includes(e.status)).reduce((t, { priced }) => ({ n: t.n + 1, profit: t.profit + priced.totals.profit, price: t.price + priced.totals.grandTotal }), { n: 0, profit: 0, price: 0 });
+  const open = sum(['draft', 'sent']);
+  const won = sum(['won']);
+
   return (
     <div className="stack">
       <div className="row between">
@@ -39,6 +44,13 @@ export function EstimatesPage() {
           <button className="btn primary" onClick={() => setAdding(true)}>New estimate</button>
         </div>
       </div>
+      {isAdmin && rows.length > 0 && (
+        <dl className="figs strip" aria-label="Projected profit">
+          <div><dt>Projected profit, waiting on client ({open.n})</dt><dd>{usd(open.profit)}</dd><dd className="muted small">on {usd(open.price)} quoted</dd></div>
+          <div><dt>Profit on accepted jobs ({won.n})</dt><dd>{usd(won.profit)}</dd><dd className="muted small">on {usd(won.price)} sold</dd></div>
+          <div><dt>Total projected profit</dt><dd><b>{usd(open.profit + won.profit)}</b></dd><dd className="muted small">Not-accepted quotes left out</dd></div>
+        </dl>
+      )}
       {catalog.length === 0 && <div className="alert warn">The price catalog is empty, so house estimates will price at $0. Open <Link to="/estimates/catalog">Price catalog</Link> to load it.</div>}
       <div className="filters">
         <label className="field"><span>Search</span><input type="search" aria-label="Search estimates" placeholder="Client, address, or a line item" value={q} onChange={(e) => setQ(e.target.value)} /></label>
@@ -52,7 +64,7 @@ export function EstimatesPage() {
       {shown.length === 0 ? <Empty>{rows.length ? 'No estimates match.' : 'No estimates yet. Start one with New estimate.'}</Empty> : (
         <div className="tablewrap">
           <table>
-            <thead><tr><th>Client</th><th>Address</th><th>Type</th><th>Accepted?</th><th>Quote date</th><th className="right">Lines</th><th className="right">{isAdmin ? 'Client price' : 'Cost'}</th></tr></thead>
+            <thead><tr><th>Client</th><th>Address</th><th>Type</th><th>Accepted?</th><th>Quote date</th><th className="right">Lines</th><th className="right">{isAdmin ? 'Client price' : 'Cost'}</th>{isAdmin && <th className="right">Projected profit</th>}</tr></thead>
             <tbody>
               {shown.map(({ e, priced }) => (
                 <tr key={e.id}>
@@ -63,6 +75,7 @@ export function EstimatesPage() {
                   <td className="num small">{e.quote_date}</td>
                   <td className="right num">{priced.lines.length}</td>
                   <td className="right num">{usd(isAdmin ? priced.totals.grandTotal : priced.totals.material + priced.totals.labor)}</td>
+                  {isAdmin && <td className={`right num${e.status === 'lost' ? ' muted' : ''}`}>{usd(priced.totals.profit)}</td>}
                 </tr>
               ))}
             </tbody>
