@@ -59,7 +59,7 @@ export function InvoicesPage() {
         <div><dt>Owed to you</dt><dd>{money(owed)}</dd></div>
         <div><dt>Invoices</dt><dd>{all.length}</dd></div>
       </dl>
-      <p className="muted">To bill a customer: open their estimate, click <b>Job accepted</b>, then <b>Make invoice</b>.</p>
+      <p className="muted">To bill a customer: open their estimate, click <b>Yes, accepted</b>, then <b>Make invoice</b>.</p>
       {rows.length === 0 ? <Empty>{show === 'open' ? 'Nothing is waiting to be paid.' : 'No invoices yet.'}</Empty> : <InvoiceTable rows={rows} />}
     </div>
   );

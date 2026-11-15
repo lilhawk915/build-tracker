@@ -347,7 +347,7 @@ await step('quote to invoice', admin, async () => {
   check('Mark as sent sets the quote to Sent', sql(`select status from public.estimates where id = '${est}';`) === 'sent');
   await admin.getByLabel('Status').selectOption('won');
   await admin.getByRole('heading', { name: 'Job accepted' }).waitFor();
-  check('Choosing Won opens the Job accepted dialog', true);
+  check('Choosing Accepted opens the Job accepted dialog', true);
   await admin.getByLabel('New job name').fill('100 Sample Rd');
   await admin.getByRole('button', { name: 'Accept and set up the job' }).click();
   await admin.getByText('Accepted. Job:').waitFor();
@@ -357,7 +357,14 @@ await step('quote to invoice', admin, async () => {
   await undoBtn.click();
   await admin.getByText('Undone: Job accepted').waitFor();
   check('Undo takes back the whole accept: job gone, quote back to Sent', sql(`select count(*) from public.jobs where name = '100 Sample Rd';`) === '0' && sql(`select status || ' ' || coalesce(job_id::text, 'none') from public.estimates where id = '${est}';`) === 'sent none');
-  await admin.getByRole('button', { name: 'Job accepted' }).click();
+  await admin.getByRole('button', { name: 'No, not accepted' }).click();
+  await settle(admin);
+  check('No, not accepted marks the quote lost', sql(`select status from public.estimates where id = '${est}';`) === 'lost');
+  await admin.locator('.accepted .chip.bad').waitFor();
+  await admin.getByRole('button', { name: 'Change back to waiting' }).click();
+  await settle(admin);
+  check('Change back to waiting sets it to Sent', sql(`select status from public.estimates where id = '${est}';`) === 'sent');
+  await admin.getByRole('button', { name: 'Yes, accepted' }).click();
   await admin.getByLabel('New job name').fill('100 Sample Rd');
   await admin.getByRole('button', { name: 'Accept and set up the job' }).click();
   await admin.getByText('Accepted. Job:').waitFor();
@@ -469,7 +476,7 @@ await step('deposit, change order and final invoice', admin, async () => {
   const [q] = await Promise.all([admin.waitForEvent('download', { timeout: 30000 }), admin.getByRole('button', { name: 'Client quote PDF' }).click()]);
   await q.saveAs(`${out}/drywall-quote.pdf`);
   check('The client quote PDF downloads', readFileSync(`${out}/drywall-quote.pdf`).subarray(0, 4).toString() === '%PDF');
-  await admin.getByRole('button', { name: 'Job accepted' }).click();
+  await admin.getByRole('button', { name: 'Yes, accepted' }).click();
   await admin.getByLabel('New job name').fill('100 Sample Rd - Drywall');
   await admin.getByRole('button', { name: 'Accept and set up the job' }).click();
   await admin.getByText('Accepted. Job:').waitFor();

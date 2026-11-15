@@ -7,7 +7,7 @@ import { newProject } from '../../estimator/domain/house/defaults';
 import { priceProject } from '../../estimator/domain/pricing/resolve';
 import { COST_ONLY, useEstimating, usd } from '../../estimator/ui';
 
-const STATUS_WORD: Record<string, string> = { draft: 'Draft', sent: 'Sent', won: 'Won', lost: 'Lost' };
+const STATUS_WORD: Record<string, string> = { draft: 'Draft', sent: 'Sent, waiting', won: 'Accepted', lost: 'Not accepted' };
 
 export function EstimatesPage() {
   const { data, run } = useData();
@@ -52,7 +52,7 @@ export function EstimatesPage() {
       {shown.length === 0 ? <Empty>{rows.length ? 'No estimates match.' : 'No estimates yet. Start one with New estimate.'}</Empty> : (
         <div className="tablewrap">
           <table>
-            <thead><tr><th>Client</th><th>Address</th><th>Type</th><th>Status</th><th>Quote date</th><th className="right">Lines</th><th className="right">{isAdmin ? 'Client price' : 'Cost'}</th></tr></thead>
+            <thead><tr><th>Client</th><th>Address</th><th>Type</th><th>Accepted?</th><th>Quote date</th><th className="right">Lines</th><th className="right">{isAdmin ? 'Client price' : 'Cost'}</th></tr></thead>
             <tbody>
               {shown.map(({ e, priced }) => (
                 <tr key={e.id}>

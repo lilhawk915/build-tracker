@@ -12,7 +12,7 @@ import { HouseInputs } from './HouseInputs';
 import { LineTable } from './LineTable';
 import { QuoteToInvoice } from './QuoteToInvoice';
 
-const STATUS = [['draft', 'Draft'], ['sent', 'Sent to client'], ['won', 'Won'], ['lost', 'Lost']] as const;
+const STATUS = [['draft', 'Draft'], ['sent', 'Sent, waiting on client'], ['won', 'Accepted'], ['lost', 'Not accepted']] as const;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 function MarkupsBox({ project, priced, update }: { project: Project; priced: ReturnType<typeof priceProject>; update: (c: (p: Project) => Project) => void }) {

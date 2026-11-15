@@ -31,7 +31,7 @@ export function QuoteToInvoice({ row, project, priced, onStatus, acceptNow, onAc
   const { data, run } = useData();
   const nav = useNavigate();
   const [accepting, setAccepting] = useState(false);
-  // Picking "Won" in the status list opens the same dialog, so a won quote always lands on a job.
+  // Picking "Accepted" in the status list opens the same dialog, so a won quote always lands on a job.
   useEffect(() => { if (acceptNow) { setAccepting(true); onAcceptShown?.(); } }, [acceptNow]);
   const job = data.jobs.find((j) => j.id === row.job_id);
   const invoices = data.invoices.filter((i) => i.estimate_id === row.id).sort((a, b) => a.number - b.number);
@@ -50,6 +50,10 @@ export function QuoteToInvoice({ row, project, priced, onStatus, acceptNow, onAc
     await store.update('estimates', row.id, { status: 'sent' });
     onStatus('sent');
   }, 'Marked as sent to the client.');
+  const setOutcome = (s: EstimateRow['status']) => run(async () => {
+    await store.update('estimates', row.id, { status: s });
+    onStatus(s);
+  }, s === 'lost' ? 'Marked not accepted.' : 'Back to waiting on the client.');
 
   const makeInvoice = async (kind: InvoiceKind, lines: Invoice['lines'], done: string, terms = 'Due on receipt') => {
     const id = crypto.randomUUID();
@@ -83,12 +87,23 @@ export function QuoteToInvoice({ row, project, priced, onStatus, acceptNow, onAc
         {steps.map(([label, done], n) => <li key={label} className={done ? 'done' : n === nowAt ? 'now' : ''}>{label}{done ? ' ✓' : ''}</li>)}
       </ol>
       {!job && (
-        <div className="stack">
-          <div className="row">
-            {row.status === 'draft' && <button className="btn" onClick={markSent}>Mark as sent</button>}
-            <button className="btn primary" onClick={() => setAccepting(true)}>Job accepted</button>
-            {row.status === 'lost' && <span className="muted">This quote is marked lost.</span>}
-          </div>
+        <div className="stack accepted" aria-label="Was the job accepted?" role="group">
+          <b>Was the job accepted?</b>
+          {row.status === 'lost' ? (
+            <div className="row">
+              <span className="chip bad">Not accepted</span>
+              <span className="muted small">The client said no. This quote stays here for your records.</span>
+              <button className="btn" onClick={() => void setOutcome(row.status === 'lost' ? 'sent' : row.status)}>Change back to waiting</button>
+              <button className="btn" onClick={() => setAccepting(true)}>They accepted after all</button>
+            </div>
+          ) : (
+            <div className="row">
+              <button className="btn primary" onClick={() => setAccepting(true)}>Yes, accepted</button>
+              <button className="btn" onClick={() => void setOutcome('lost')}>No, not accepted</button>
+              {row.status === 'draft' && <button className="btn" onClick={markSent}>Mark as sent</button>}
+              <span className="muted small">{row.status === 'sent' ? 'Sent. Waiting on the client.' : 'Not sent yet.'}</span>
+            </div>
+          )}
           {row.status === 'sent' && <p className="muted small">Wait for the signed quote. The signed quote is the agreement, so don't order anything or schedule the job until you have it.</p>}
         </div>
       )}
@@ -124,7 +139,7 @@ export function QuoteToInvoice({ row, project, priced, onStatus, acceptNow, onAc
         <FormModal
           title="Job accepted"
           submit="Accept and set up the job"
-          intro={<p>Use this once the client has signed the quote. It marks the quote as won and puts it on a job, so you can invoice it. Quote total: <b>{money(totalCents)}</b>.</p>}
+          intro={<p>Use this once the client has signed the quote. It marks the quote as accepted and puts it on a job, so you can invoice it. Quote total: <b>{money(totalCents)}</b>.</p>}
           fields={[
             { key: 'job', label: 'Job', type: 'select', options: [{ value: 'new', label: 'Make a new job' }, ...data.jobs.filter((j) => j.status !== 'closed').map((j) => ({ value: j.id, label: `Add to ${j.name}` }))] },
             { key: 'name', label: 'New job name', help: 'Only used when making a new job.' },
