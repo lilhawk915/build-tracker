@@ -11,6 +11,7 @@ import { COST_ONLY, NumberCell, TextBlock, TextCell, downloadFile, qtyText, safe
 import { HouseInputs } from './HouseInputs';
 import { LineTable } from './LineTable';
 import { QuoteToInvoice } from './QuoteToInvoice';
+import { WORK_TYPE_HINT, WorkTypeList } from './workType';
 
 const STATUS = [['draft', 'Draft'], ['sent', 'Sent, waiting on client'], ['won', 'Accepted'], ['lost', 'Not accepted']] as const;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -150,6 +151,8 @@ export function EstimatePage() {
       <div className="panel estimatehead">
         {project.quoteNumber ? <h1 style={{ margin: 0 }}>Quote #{project.quoteNumber}</h1> : null}
         <div className="inrow"><span>Client</span><TextCell className="field" label="Client name" value={project.clientName} onCommit={(v) => update((p) => ({ ...p, clientName: v }))} /></div>
+        <div className="inrow"><span>Type of work</span><TextCell className="field" label="Type of work" value={row.work_type ?? ''} placeholder={WORK_TYPE_HINT} list="work-types" onCommit={(v) => { void run(() => store.update('estimates', row.id, { work_type: v.trim() } as never), 'Type of work saved.'); }} /></div>
+        <WorkTypeList />
         <div className="inrow"><span>Property address</span><TextCell className="field" label="Property address" value={project.address} onCommit={(v) => update((p) => ({ ...p, address: v }))} /></div>
         <div className="inrow"><span>Quote date</span><TextCell className="field" type="date" label="Quote date" value={project.date} onCommit={(v) => v && update((p) => ({ ...p, date: v }))} /></div>
         <div className="inrow"><span>Valid for (days)</span><NumberCell className="field num" label="Valid for days" value={project.validityDays} min={1} onCommit={(v) => v && update((p) => ({ ...p, validityDays: Math.round(v) }))} /></div>
@@ -174,7 +177,6 @@ export function EstimatePage() {
         <dl className="figs strip">
           <div><dt>{isAdmin ? 'Client price' : 'Cost (material + labor)'}</dt><dd>{usd(isAdmin ? priced.totals.grandTotal : priced.totals.material + priced.totals.labor)}</dd></div>
           {isAdmin && <div><dt>Profit</dt><dd>{usd(priced.totals.profit)}</dd></div>}
-          <div><dt>Type</dt><dd>{project.kind === 'house' ? 'House estimate' : 'Custom quote'}</dd></div>
           <div><dt>Valid through</dt><dd>{through}</dd></div>
         </dl>
       </div>

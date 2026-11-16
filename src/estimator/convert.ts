@@ -11,6 +11,8 @@ export interface EstimateRow {
   status: 'draft' | 'sent' | 'won' | 'lost';
   client_name: string;
   address: string;
+  /** Plain-words type of work, such as "Custom home" or "Insulation". Blank on older estimates. */
+  work_type?: string;
   quote_date: string;
   notes: string;
   inputs: HouseInputs;

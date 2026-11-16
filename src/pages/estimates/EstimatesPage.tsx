@@ -6,6 +6,7 @@ import { projectToRows, rowsToProject } from '../../estimator/convert';
 import { newProject } from '../../estimator/domain/house/defaults';
 import { priceProject } from '../../estimator/domain/pricing/resolve';
 import { COST_ONLY, useEstimating, usd } from '../../estimator/ui';
+import { workTypeText } from './workType';
 
 const STATUS_WORD: Record<string, string> = { draft: 'Draft', sent: 'Sent, waiting', won: 'Accepted', lost: 'Not accepted' };
 
@@ -26,7 +27,7 @@ export function EstimatesPage() {
 
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const shown = rows.filter(({ e, priced }) => (!show || e.status === show) && words.every((w) =>
-    [e.client_name, e.address, e.notes, e.assumptions, ...priced.lines.map((l) => l.name)].join(' ').toLowerCase().includes(w)));
+    [e.client_name, e.address, workTypeText(e), e.notes, e.assumptions, ...priced.lines.map((l) => l.name)].join(' ').toLowerCase().includes(w)));
 
   // Profit you could still make (draft or sent) and profit already won. Not-accepted quotes count for nothing.
   const sum = (st: string[]) => rows.filter(({ e }) => st.includes(e.status)).reduce((t, { priced }) => ({ n: t.n + 1, profit: t.profit + priced.totals.profit, price: t.price + priced.totals.grandTotal }), { n: 0, profit: 0, price: 0 });
@@ -70,7 +71,7 @@ export function EstimatesPage() {
                 <tr key={e.id}>
                   <td><Link to={`/estimates/${e.id}`}><b>{e.client_name || '(no name)'}</b></Link></td>
                   <td>{e.address}</td>
-                  <td>{e.kind === 'house' ? 'House' : 'Custom'}</td>
+                  <td>{workTypeText(e)}</td>
                   <td><Status s={e.status === 'won' ? 'approved' : e.status === 'lost' ? 'rejected' : e.status === 'sent' ? 'sent' : 'pending'} /> <span className="small">{STATUS_WORD[e.status]}</span></td>
                   <td className="num small">{e.quote_date}</td>
                   <td className="right num">{priced.lines.length}</td>
@@ -89,6 +90,7 @@ export function EstimatesPage() {
           fields={[
             { key: 'client_name', label: 'Client or job name', required: true },
             { key: 'address', label: 'Property address' },
+            { key: 'work_type', label: 'Type of work', help: 'For example: Custom home, Insulation, Mold remediation' },
             { key: 'kind', label: 'Type', type: 'select', options: [{ value: 'custom', label: 'Custom quote: add each line yourself' }, { value: 'house', label: 'House estimate: lines filled in from the house details' }] },
           ]}
           initial={{ kind: 'custom' }}
@@ -99,7 +101,7 @@ export function EstimatesPage() {
             p.clientName = String(v.client_name).trim();
             p.address = String(v.address ?? '').trim();
             const { estimate } = projectToRows(p, id, settings);
-            const ok = await run(() => store.insert('estimates', { ...estimate, legacy_id: null } as never), 'Estimate started.');
+            const ok = await run(() => store.insert('estimates', { ...estimate, legacy_id: null, work_type: String(v.work_type ?? '').trim() } as never), 'Estimate started.');
             if (ok) { setAdding(false); nav(`/estimates/${id}`); }
           }}
         />

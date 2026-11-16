@@ -93,10 +93,16 @@ await step('custom estimate', admin, async () => {
   await admin.getByRole('button', { name: 'New estimate' }).click();
   await admin.getByRole('dialog').getByLabel('Client or job name').fill('Sample Rd - Concrete');
   await admin.getByRole('dialog').getByLabel('Property address').fill('100 Sample Rd');
+  await admin.getByRole('dialog').getByLabel('Type of work').fill('Concrete');
   await admin.getByRole('dialog').getByRole('button', { name: 'Start estimate' }).click();
   await admin.getByRole('heading', { name: 'Profit and markups' }).waitFor();
   estId = new URL(admin.url()).pathname.split('/').pop();
   check('Start a custom quote', estId.length > 20);
+  check('Type of work typed when starting is saved', sql(`select work_type from public.estimates where id = '${estId}';`) === 'Concrete');
+  await admin.getByLabel('Type of work').fill('Concrete patios');
+  await admin.getByLabel('Type of work').press('Enter');
+  await admin.getByText('Type of work saved.').waitFor();
+  check('Type of work can be changed on the estimate', sql(`select work_type from public.estimates where id = '${estId}';`) === 'Concrete patios');
   check('New quote starts with the default 10% profit', sql(`select profit_pct from public.estimate_markups where estimate_id = '${estId}';`) === '10');
   for (const [name, total] of [['Concrete, all pads and step', 3000], ['Gravel and rebar', 500], ['Labor: forming, placing and finishing', 1400]]) {
     await admin.getByLabel('Add a line').selectOption('Foundation');
@@ -167,6 +173,7 @@ await step('staff view', staff, async () => {
   await staff.goto(`${BASE}/estimates`);
   await staff.getByRole('heading', { name: 'Estimates' }).waitFor();
   let t = await staff.locator('main').innerText();
+  check('The list shows the type of work', t.includes('Concrete patios'));
   check('Staff see the estimate at cost: $4,900, not $9,800', t.includes('Sample Rd - Concrete') && t.includes('$4,900.00') && !t.includes('$9,800'));
   check('Staff see no projected profit on the list', !t.includes('Projected profit') && !t.includes('projected profit'));
   await staff.getByRole('link', { name: 'Sample Rd - Concrete' }).click();
@@ -203,7 +210,7 @@ await step('house estimate', admin, async () => {
   check('Admins see projected profit on the list: $4,900 waiting on the client', pp.includes('Projected profit, waiting on client (1)') && pp.includes('$4,900.00'));
   await admin.getByRole('button', { name: 'New estimate' }).click();
   await admin.getByRole('dialog').getByLabel('Client or job name').fill('Sample house');
-  await admin.getByRole('dialog').getByLabel('Type').selectOption('house');
+  await admin.getByRole('dialog').getByLabel('Type', { exact: true }).selectOption('house');
   await admin.getByRole('dialog').getByRole('button', { name: 'Start estimate' }).click();
   await admin.getByRole('heading', { name: 'Profit and markups' }).waitFor();
   const before = await admin.locator('table.lines tbody tr:not(.division)').count();
@@ -572,7 +579,7 @@ await step('leads', admin, async () => {
   let l = row();
   check('Quick add pulls out the name, phone and 5 houses, and keeps the whole line', l.name === 'Sam Sample' && l.phone === '555-532-2471' && l.houses === 5 && l.notes.includes('split profit') && l.stage === 'new', JSON.stringify(l).slice(0, 200));
   await typeIn(admin.getByLabel('Profit per house'), 30000);
-  await admin.getByLabel('Type').selectOption('investor');
+  await admin.getByLabel('Type', { exact: true }).selectOption('investor');
   await typeIn(admin.getByLabel('Deal terms'), 'Split profit, or $30K a build');
   await admin.waitForTimeout(800);
   check('Lead page shows 5 houses x $30,000 = $150,000 projected profit', (await admin.locator('main').innerText()).includes('$150,000'));

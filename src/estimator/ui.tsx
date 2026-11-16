@@ -57,8 +57,8 @@ export function NumberCell({
   );
 }
 
-export function TextCell({ value, onCommit, label, edited, className = 'cell', type = 'text', placeholder }: {
-  value: string; onCommit: (v: string) => void; label: string; edited?: boolean; className?: string; type?: string; placeholder?: string;
+export function TextCell({ value, onCommit, label, edited, className = 'cell', type = 'text', placeholder, list }: {
+  value: string; onCommit: (v: string) => void; label: string; edited?: boolean; className?: string; type?: string; placeholder?: string; list?: string;
 }) {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
@@ -68,6 +68,7 @@ export function TextCell({ value, onCommit, label, edited, className = 'cell', t
       className={`${className}${edited ? ' edited' : ''}`}
       aria-label={label}
       placeholder={placeholder}
+      list={list}
       value={text}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => { if (text !== value) onCommit(text); }}
