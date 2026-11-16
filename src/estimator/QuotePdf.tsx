@@ -141,15 +141,16 @@ function QuoteDocument({ mode, project, catalog, settings, versionLabel }: Quote
           <View>
             <View style={s.tableHead} fixed>
               <Text style={{ flex: 1 }}>{project.kind === 'custom' ? 'Scope of work' : 'Division'}</Text>
-              <Text style={[{ width: 100 }, s.right]}>Amount</Text>
+              {project.kind !== 'custom' && <Text style={[{ width: 100 }, s.right]}>Amount</Text>}
             </View>
+            {/* Custom quotes go to clients as one lump sum: sections and items by name, one total, no section prices. */}
             {divisions
               .filter((d) => d.clientAmount !== 0 || (project.kind === 'custom' && counted.some((l) => l.division === d.division)))
               .map((d) => (
                 <View key={d.division} wrap={false}>
                   <View style={project.kind === 'custom' ? s.divisionRow : s.row}>
                     <Text style={{ flex: 1 }}>{d.division}</Text>
-                    <Text style={[{ width: 100 }, s.right]}>{usd(d.clientAmount)}</Text>
+                    {project.kind !== 'custom' && <Text style={[{ width: 100 }, s.right]}>{usd(d.clientAmount)}</Text>}
                   </View>
                   {/* A custom quote lists its scope items by name, with no prices, like a contractor's scope sheet. */}
                   {project.kind === 'custom' &&
@@ -163,7 +164,7 @@ function QuoteDocument({ mode, project, catalog, settings, versionLabel }: Quote
                 </View>
               ))}
             <View style={s.totalRow} wrap={false}>
-              <Text style={{ flex: 1 }}>Total</Text>
+              <Text style={{ flex: 1 }}>{project.kind === 'custom' ? 'Total, lump sum' : 'Total'}</Text>
               <Text style={[{ width: 120 }, s.right]}>{usd(totals.grandTotal)}</Text>
             </View>
           </View>
