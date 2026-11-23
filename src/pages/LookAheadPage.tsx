@@ -5,6 +5,7 @@ import { Empty, Modal } from '../components/ui';
 import { useData } from '../data';
 import { firstNameOf, LOOKAHEAD_DAYS, lookAhead, lookAheadGroups, lookAheadText, primaryContact, shortDate } from '../domain/jobops';
 import { todayIso } from '../domain/rules';
+import { checkStatus } from '../domain/checks';
 import type { Task } from '../domain/types';
 
 const CHIP = { not_contacted: 'bad', contacted: 'warn', confirmed: 'good' } as const;
@@ -84,6 +85,7 @@ export function LookAheadPage() {
                         {t.status === 'in_progress' && <span className="chip good">Started</span>}
                         {t.status === 'todo' && t.vendor_id && <span className={`chip ${CHIP[t.contact_status]}`}>{CONTACT_LABEL[t.contact_status]}</span>}
                         {t.status === 'todo' && !t.vendor_id && t.assigned_to && <span className="chip">Our crew</span>}
+                        {(() => { const c = checkStatus(data.step_checks, t.id); return c.total && !c.complete ? <div><span className="chip warn">Checklist {c.done}/{c.total}</span></div> : null; })()}
                       </td>
                     </tr>
                   );

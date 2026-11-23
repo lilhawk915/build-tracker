@@ -143,7 +143,7 @@ await modal().getByRole('button', { name: 'Add job' }).click();
 await page.getByRole('heading', { name: 'Budget lines' }).waitFor();
 const copyId = new URL(page.url()).pathname.split('/')[2];
 const counts = await page.evaluate(([id]) => {
-  const db = JSON.parse(localStorage.getItem('build-tracker-demo-v8') ?? '{}');
+  const db = JSON.parse(localStorage.getItem('build-tracker-demo-v9') ?? '{}');
   const of = (t) => (db[t] ?? []).filter((r) => r.job_id === id);
   const src = (t) => (db[t] ?? []).filter((r) => r.job_id === 'oak');
   const sum = (rows) => rows.reduce((a, r) => a + r.budget_cents, 0);
@@ -359,6 +359,52 @@ const moveText = await modal().innerText();
 check('moving work prices the slip', moveText.includes('The finish moves 5 days later') && moveText.includes('about $591.80 more to carry'));
 await shot('23b-slip-cost');
 await modal().getByRole('button', { name: 'Cancel' }).click();
+
+// Walk-through checklists.
+check('started step shows its unfinished checklist', (await row('Frame house').first().innerText()).includes('Checklist 2/5'));
+check('insulation step has the standard list', (await row('Rough inspections and insulation').first().innerText()).includes('Checklist 0/6'));
+await row('Rough inspections and insulation').first().getByRole('button', { name: 'Edit' }).click();
+await modal().getByLabel('Status').selectOption('in_progress');
+await modal().getByRole('button', { name: 'Save task' }).click();
+await page.getByText('Finish the walk-through checklist for Rough inspections and insulation first: 0 of 6 done.').waitFor();
+check('step with an unfinished checklist cannot start', true);
+await modal().getByRole('button', { name: 'Cancel' }).click();
+await row('Rough inspections and insulation').first().getByRole('button', { name: 'Checklist', exact: true }).click();
+const boxes = modal().getByRole('checkbox');
+check('checklist modal lists the items', (await boxes.count()) === 6 && (await modal().innerText()).includes('Blocking in for cabinets'));
+for (let i = 0; i < 6; i++) { await boxes.nth(i).check(); await page.waitForTimeout(150); }
+check('ticked items show who and when', (await modal().innerText()).includes('6 of 6 done') && (await modal().innerText()).includes('Owner'));
+await shot('23c-checklist');
+await modal().getByRole('button', { name: 'Close' }).last().click();
+await row('Rough inspections and insulation').first().getByRole('button', { name: 'Edit' }).click();
+await modal().getByLabel('Status').selectOption('in_progress');
+await modal().getByRole('button', { name: 'Save task' }).click();
+await page.getByText('Task saved').waitFor();
+check('finished checklist lets the step start', (await row('Rough inspections and insulation').first().innerText()).includes('Checklist 6/6'));
+await row('Paint').first().getByRole('button', { name: 'Add checklist' }).click();
+check('step with no list offers to add one', (await modal().innerText()).includes('No checklist on this step yet'));
+await modal().getByLabel('Add an item').fill('Caulk every trim joint');
+await modal().getByRole('button', { name: 'Add', exact: true }).click();
+await page.getByText('Item added').waitFor();
+await modal().getByRole('button', { name: 'Close' }).last().click();
+check('custom item shows on the step', (await row('Paint').first().innerText()).includes('Checklist 0/1'));
+await page.goto(`${BASE}/`);
+check('today flags the started step with an open checklist', (await text()).includes('Walk the checklist before Frame house: 2 of 5 done'));
+
+// Percent done and what's left on the budget.
+await page.goto(`${BASE}/jobs/oak/budget`);
+await page.getByRole('heading', { name: 'Budget lines' }).waitFor();
+t = await text();
+check('budget shows left to finish and work done', t.includes('Left to finish') && /Work done, by budget\s*\d+%/.test(t));
+check('framing row shows 50% done', (await row('Framing').innerText()).includes('50%'));
+await row('Foundation').first().getByRole('button', { name: 'Edit' }).click();
+await modal().getByLabel('% done').fill('50');
+await modal().getByRole('button', { name: 'Save line' }).click();
+await page.getByText('Line saved').waitFor();
+check('spending ahead of the work is flagged on the line', (await row('Foundation').first().innerText()).includes('98% spent, 50% done'));
+await shot('23d-budget-pct');
+await page.goto(`${BASE}/`);
+check('today warns when spending runs ahead', (await text()).includes('Foundation is 50% done but has used 98% of its budget'));
 await page.goto(`${BASE}/jobs/oak/schedule`);
 await page.getByRole('heading', { name: 'Schedule' }).waitFor();
 check('schedule says behind and names the task', /days? behind/.test(await page.locator('.alert').innerText()));

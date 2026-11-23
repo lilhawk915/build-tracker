@@ -1,3 +1,4 @@
+import { standardChecksFor } from '../domain/checks';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Empty, FormModal, HealthChip, money, Status, Tape, TapeLegend } from '../components/ui';
@@ -117,13 +118,18 @@ export function Today() {
               if (from.startsWith('job:')) {
                 const src = from.slice(4);
                 const of = <T extends { job_id: string }>(rows: T[]) => rows.filter((r) => r.job_id === src);
-                const plan = copyPlan({ tasks: of(data.tasks), budget_lines: of(data.budget_lines), materials: of(data.materials) }, id, (job.start_date as string) || today);
+                const plan = copyPlan({ tasks: of(data.tasks), budget_lines: of(data.budget_lines), materials: of(data.materials), step_checks: of(data.step_checks) }, id, (job.start_date as string) || today);
                 if (plan.budget_lines.length) await store.insert('budget_lines', plan.budget_lines);
                 if (plan.tasks.length) await store.insert('tasks', plan.tasks);
                 if (plan.materials.length) await store.insert('materials', plan.materials as never);
+                if (plan.step_checks.length) await store.insert('step_checks', plan.step_checks);
               } else if (from === 'standard' && isNewHouse(job.job_type as JobType)) {
                 await store.insert('budget_lines', starterBudget(id));
-                if (job.start_date) await store.insert('tasks', starterSchedule(id, job.start_date as string));
+                if (job.start_date) {
+                  const steps = starterSchedule(id, job.start_date as string);
+                  await store.insert('tasks', steps);
+                  await store.insert('step_checks', standardChecksFor(steps) as never);
+                }
               } else if (!isNewHouse(job.job_type as JobType)) {
                 await store.insert('budget_lines', { job_id: id, code: '01', name: 'General', budget_cents: 0, bought_out: false, sort: 0 });
               }

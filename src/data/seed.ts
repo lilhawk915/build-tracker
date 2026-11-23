@@ -1,4 +1,5 @@
 // Sample data for demo mode only. Dates are relative to today so the demo always has live flags.
+import { standardChecksFor } from '../domain/checks';
 import { todayIso } from '../domain/rules';
 import { catalogToRow } from '../estimator/convert';
 import { seedCatalog } from '../estimator/domain/catalog/seed';
@@ -20,7 +21,7 @@ export function seed(): DB {
   const d = (n: number) => addDays(today, n);
   const db: DB = {
     vendors: [], profiles: [], team_invites: [], jobs: [], budget_lines: [], pos: [], bills: [], change_orders: [],
-    draws: [], draw_lines: [], lien_waivers: [], tasks: [], daily_logs: [], photos: [], selections: [], documents: [], job_steps: [], scope_items: [], materials: [], notifications: [], vendor_contacts: [], auto_texts: [],
+    draws: [], draw_lines: [], lien_waivers: [], tasks: [], daily_logs: [], photos: [], selections: [], documents: [], job_steps: [], step_checks: [], scope_items: [], materials: [], notifications: [], vendor_contacts: [], auto_texts: [],
     estimates: [], estimate_markups: [], estimate_versions: [], expenses: [], invoices: [], leads: [], lead_appointments: [], invoice_payments: [],
     catalog_items: seedCatalog().map(catalogToRow),
     company_settings: [{ id: 'main', name: 'Sample Builders', address: '', phone: '', email: '', license: '', logo_data_url: null, default_assumptions: defaultSettings().defaultAssumptions, default_validity_days: 30 }],
@@ -148,6 +149,15 @@ export function seed(): DB {
     notes: 'Buyer loved the open kitchen. Basement stayed dry through spring rains.',
   });
   const oak = db.jobs.find((j) => j.id === 'oak')!;
+  // Walk-through checklists on the cover-up steps; one partly walked.
+  for (const c of standardChecksFor(db.tasks.filter((t) => t.status !== 'done'))) db.step_checks.push({ ...c, id: crypto.randomUUID() });
+  const dryIn = db.step_checks.filter((c) => c.task_id === named('Frame house').id);
+  dryIn.slice(0, 2).forEach((c) => Object.assign(c, { done: true, done_by: 'Owner', done_at: `${d(-40)}T15:00:00Z` }));
+  // Percent done on a few Oak Ridge lines: framing spending is ahead of the work.
+  for (const l of db.budget_lines.filter((x) => x.job_id === 'oak')) {
+    if (['03', '04', '05', '06'].includes(l.code)) l.pct_complete = 100;
+    if (l.code === '07') l.pct_complete = 50;
+  }
   Object.assign(oak, { plan_name: 'The Sample Two-Story', square_feet: 2400, bedrooms: 4, bathrooms: 2.5, stories: 2, interest_rate: 12, holding_monthly_cents: 60000 });
 
   job('deck', 'Sample St deck repair', '310 Sample St', 'repair', 'closed', 12500, 0, '2025-06-02', '2025-06-13');

@@ -74,6 +74,12 @@ export interface Job {
 }
 export interface BudgetLine {
   id: string; job_id: string; code: string; name: string; budget_cents: number; bought_out: boolean; sort: number;
+  /** How much of this line's work is done, 0 to 100. Null until someone sets it. */
+  pct_complete?: number | null;
+}
+/** One item on a step's walk-through checklist. The step can't be started until every item is ticked. */
+export interface StepCheck {
+  id: string; job_id: string; task_id: string; label: string; done: boolean; done_at: string | null; done_by: string; sort: number;
 }
 export interface Po {
   id: string; job_id: string; vendor_id: string; budget_line_id: string; number: number; description: string;
@@ -173,7 +179,7 @@ export interface LeadAppointment {
 export interface Tables {
   vendors: Vendor; profiles: Profile; team_invites: Invite; jobs: Job; budget_lines: BudgetLine; pos: Po; bills: Bill;
   change_orders: ChangeOrder; draws: Draw; draw_lines: DrawLine; lien_waivers: Waiver; tasks: Task;
-  daily_logs: DailyLog; photos: Photo; selections: Selection; documents: Document; job_steps: JobStep;
+  daily_logs: DailyLog; photos: Photo; selections: Selection; documents: Document; job_steps: JobStep; step_checks: StepCheck;
   scope_items: ScopeItem; materials: Material; notifications: Notification; vendor_contacts: VendorContact;
   auto_text_settings: AutoTextSettings; auto_texts: AutoTextLog;
   estimates: EstimateRow; estimate_markups: MarkupsRow; estimate_versions: EstimateVersionRow; catalog_items: CatalogRow;

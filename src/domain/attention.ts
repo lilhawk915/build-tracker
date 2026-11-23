@@ -1,12 +1,13 @@
-import { rollupLines } from './budget';
+import { lineProgress, rollupLines } from './budget';
 import { arrivesTooLate, CALL_WINDOW_DAYS, callList, dailyCarryCents, isRequested, leadWords, materialLate, neededOn, orderFlag, scheduleHealth, stepFor } from './jobops';
+import { checksDue } from './checks';
 import { addDays } from './schedule';
 import { coiFlag, isLate, payBlockers } from './rules';
-import type { Bill, BudgetLine, ChangeOrder, Draw, Job, Material, Photo, Po, Task, Vendor, Waiver } from './types';
+import type { Bill, BudgetLine, ChangeOrder, Draw, Job, Material, Photo, Po, StepCheck, Task, Vendor, Waiver } from './types';
 
 export interface WorkData {
   jobs: Job[]; vendors: Vendor[]; budget_lines: BudgetLine[]; pos: Po[]; bills: Bill[]; change_orders: ChangeOrder[];
-  draws: Draw[]; lien_waivers: Waiver[]; tasks: Task[]; materials?: Material[]; photos?: Photo[];
+  draws: Draw[]; lien_waivers: Waiver[]; tasks: Task[]; materials?: Material[]; photos?: Photo[]; step_checks?: StepCheck[];
 }
 
 export interface Attention {
@@ -30,6 +31,10 @@ export function attention(d: WorkData, today: string, money: (c: number) => stri
 
     for (const r of rollupLines(of(d.budget_lines), of(d.pos), bills, of(d.change_orders))) {
       if (r.over > 0) add('stop', `${r.line.name} is ${money(r.over)} over budget`, 'budget');
+      else {
+        const p = lineProgress(r);
+        if (p.behind) add('watch', `${r.line.name} is ${p.pct}% done but has used ${p.spentPct}% of its budget`, 'budget');
+      }
     }
     for (const b of bills) {
       const name = vendor(b.vendor_id)?.name ?? 'Unknown sub';
@@ -47,6 +52,10 @@ export function attention(d: WorkData, today: string, money: (c: number) => stri
     }
     for (const t of of(d.tasks)) {
       if (isLate(t, today)) add('stop', `${t.name} was due ${t.end_date}`, 'schedule');
+    }
+    for (const { task, status } of checksDue(of(d.tasks), of(d.step_checks ?? []), today)) {
+      const started = task.start_date <= today;
+      add(started ? 'stop' : 'act', `Walk the checklist before ${task.name}${started ? '' : ` starts ${task.start_date}`}: ${status.done} of ${status.total} done`, 'schedule');
     }
     for (const t of callList(of(d.tasks), today, CALL_WINDOW_DAYS)) {
       const soon = t.start_date <= addDays(today, 3);

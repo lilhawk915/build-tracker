@@ -1,5 +1,5 @@
 import { addDays, daysBetween } from './schedule';
-import type { BudgetLine, Material, Task } from './types';
+import type { BudgetLine, Material, Task, StepCheck } from './types';
 
 // Starter list for a new house. Budgets start at $0. Durations are placeholders to edit per job.
 const STEPS: { code: string; name: string; task?: string; days?: number }[] = [
@@ -56,8 +56,8 @@ export function starterSchedule(jobId: string, start: string): Task[] {
   return tasks;
 }
 
-export interface PlanSource { tasks: Task[]; budget_lines: BudgetLine[]; materials: Material[] }
-export interface CopiedPlan { tasks: Task[]; budget_lines: BudgetLine[]; materials: Omit<Material, 'requested_by' | 'requested_by_name'>[] }
+export interface PlanSource { tasks: Task[]; budget_lines: BudgetLine[]; materials: Material[]; step_checks?: StepCheck[] }
+export interface CopiedPlan { tasks: Task[]; budget_lines: BudgetLine[]; materials: Omit<Material, 'requested_by' | 'requested_by_name'>[]; step_checks: StepCheck[] }
 
 /**
  * Copies another job's plan onto a new job: every schedule step (same order, subs, people, notes and
@@ -88,5 +88,8 @@ export function copyPlan(src: PlanSource, jobId: string, start: string): CopiedP
       needed_by: first ? move(m.needed_by) : null, ordered_date: null, expected_date: null, arrived_date: null, cost_cents: null, notes: m.notes,
       lead_days: m.lead_days ?? null, task_id: m.task_id ? ids.get(m.task_id) ?? null : null,
     }));
-  return { tasks, budget_lines, materials };
+  const step_checks = (src.step_checks ?? [])
+    .filter((c) => ids.has(c.task_id))
+    .map((c): StepCheck => ({ id: uuid(), job_id: jobId, task_id: ids.get(c.task_id)!, label: c.label, done: false, done_at: null, done_by: '', sort: c.sort }));
+  return { tasks, budget_lines, materials, step_checks };
 }

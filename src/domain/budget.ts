@@ -45,6 +45,35 @@ export function rollupLines(lines: BudgetLine[], pos: Po[], bills: Bill[], cos: 
   });
 }
 
+/** Flag a line when the share of its budget spent runs this many points ahead of the share of work done. */
+export const PACE_GAP = 15;
+
+export interface LineProgress {
+  pct: number | null;       // work done, 0-100, as entered
+  spentPct: number | null;  // billed as a share of the revised budget
+  left: number;             // expected final cost minus what's billed so far (just what's still owed once 100% done)
+  behind: boolean;          // spending is running ahead of the work
+}
+
+export function lineProgress(x: LineRollup): LineProgress {
+  const raw = x.line.pct_complete;
+  const pct = raw == null ? null : Math.max(0, Math.min(100, Math.round(Number(raw))));
+  const spentPct = x.revised > 0 ? Math.round((x.billed / x.revised) * 100) : null;
+  const behind = pct != null && pct < 100 && spentPct != null && x.billed > 0 && spentPct - pct >= PACE_GAP;
+  // A finished line only has what's still owed on it left; otherwise assume it uses its expected final cost.
+  const left = Math.max(0, (pct === 100 ? x.projected : x.forecast) - x.billed);
+  return { pct, spentPct, left, behind };
+}
+
+/** How done the whole job is, weighted by each line's budget. Lines with no % count as 0. Null until any line has a %. */
+export function jobPctDone(rolls: LineRollup[]): number | null {
+  if (!rolls.some((x) => x.line.pct_complete != null)) return null;
+  const total = rolls.reduce((s, x) => s + Math.max(0, x.revised), 0);
+  if (total <= 0) return null;
+  const done = rolls.reduce((s, x) => s + Math.max(0, x.revised) * ((lineProgress(x).pct ?? 0) / 100), 0);
+  return Math.round((done / total) * 100);
+}
+
 export interface JobRollup {
   originalBudget: number; revised: number; committed: number; billed: number; paid: number; pending: number;
   forecast: number; over: number;

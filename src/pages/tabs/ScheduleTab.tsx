@@ -3,6 +3,8 @@ import { Empty, FormModal, Modal, money, Status } from '../../components/ui';
 import { store, useData } from '../../data';
 import { daysBetween, isLate, todayIso } from '../../domain/rules';
 import { dailyCarryCents, finishSlip, scheduleHealth } from '../../domain/jobops';
+import { checkStatus, standardChecksFor, startBlocker } from '../../domain/checks';
+import { ChecklistModal } from './ChecklistModal';
 import { cascade, wouldLoop, type DateChange } from '../../domain/schedule';
 import type { Job, Task, TaskStatus } from '../../domain/types';
 
@@ -10,6 +12,9 @@ export function ScheduleTab({ job }: { job: Job }) {
   const { data, run } = useData();
   const [edit, setEdit] = useState<Task | 'new' | null>(null);
   const [pending, setPending] = useState<{ task: Task; values: Partial<Task>; moves: DateChange[] } | null>(null);
+  const [checking, setChecking] = useState<Task | null>(null);
+  const checks = data.step_checks.filter((c) => c.job_id === job.id);
+  const missingStandard = standardChecksFor(data.tasks.filter((t) => t.job_id === job.id && t.status !== 'done'), checks);
   const today = todayIso();
   const tasks = data.tasks.filter((t) => t.job_id === job.id).sort((a, b) => a.start_date.localeCompare(b.start_date) || a.sort - b.sort);
   const vendorName = (id: string | null) => data.vendors.find((v) => v.id === id)?.name ?? '';
@@ -39,7 +44,12 @@ export function ScheduleTab({ job }: { job: Job }) {
     <div className="stack">
       <div className="row between">
         <h2>Schedule</h2>
-        <button className="btn primary" onClick={() => setEdit('new')}>Add a task</button>
+        <div className="row">
+          {missingStandard.length > 0 && (
+            <button className="btn" onClick={() => run(() => store.insert('step_checks', missingStandard as never), 'Walk-through checklists added.')}>Add standard checklists</button>
+          )}
+          <button className="btn primary" onClick={() => setEdit('new')}>Add a task</button>
+        </div>
       </div>
       {health.state !== 'none' && (
         <div className={`alert ${health.state === 'behind' ? '' : 'calm'}`}>
@@ -65,7 +75,14 @@ export function ScheduleTab({ job }: { job: Job }) {
                     <td>{t.name}{t.depends_on && <div className="muted small">After {taskName(t.depends_on)}</div>}</td>
                     <td>{vendorName(t.vendor_id)}{t.assigned_to && <div className="small muted">{personName(t.assigned_to)}</div>}</td>
                     <td className="num small">{t.start_date}<br />{t.end_date}</td>
-                    <td>{late ? <span className="flag">Late</span> : <Status s={t.status} />}</td>
+                    <td>
+                      {late ? <span className="flag">Late</span> : <Status s={t.status} />}
+                      {(() => {
+                        const c = checkStatus(checks, t.id);
+                        if (!c.total) return null;
+                        return <div><button className={`chip ${c.complete ? 'good' : 'warn'}`} style={{ cursor: 'pointer', marginTop: 4 }} onClick={() => setChecking(t)}>Checklist {c.done}/{c.total}</button></div>;
+                      })()}
+                    </td>
                     <td className="barcell">
                       <div className="track">
                         <div
@@ -76,7 +93,10 @@ export function ScheduleTab({ job }: { job: Job }) {
                         {nowPos >= 0 && nowPos <= 100 && <div className="now" style={{ left: `${nowPos}%` }} aria-hidden="true" />}
                       </div>
                     </td>
-                    <td className="actions"><button className="btn tiny" onClick={() => setEdit(t)}>Edit</button></td>
+                    <td className="actions">
+                      <button className="btn tiny" onClick={() => setChecking(t)}>{checkStatus(checks, t.id).total ? 'Checklist' : 'Add checklist'}</button>
+                      <button className="btn tiny" onClick={() => setEdit(t)}>Edit</button>
+                    </td>
                   </tr>
                 );
               })}
@@ -108,6 +128,10 @@ export function ScheduleTab({ job }: { job: Job }) {
           onSave={async (v) => {
             const values = { ...v, vendor_id: (v.vendor_id as string) || null, assigned_to: (v.assigned_to as string) || null, depends_on: (v.depends_on as string) || null } as Partial<Task>;
             if ((values.end_date as string) < (values.start_date as string)) throw new Error('Finish must be on or after start.');
+            if (edit !== 'new' && values.status !== 'todo' && edit.status === 'todo') {
+              const block = startBlocker(edit, checks);
+              if (block) throw new Error(block);
+            }
             if (edit === 'new') {
               if (await run(() => store.insert('tasks', { ...values, job_id: job.id, status: values.status as TaskStatus, sort: tasks.length } as never), 'Task added.')) setEdit(null);
               return;
@@ -123,6 +147,7 @@ export function ScheduleTab({ job }: { job: Job }) {
           }}
         />
       )}
+      {checking && <ChecklistModal task={checking} onClose={() => setChecking(null)} />}
       {pending && (
         <Modal title="This moves later work" onClose={() => setPending(null)}>
           <p>Saving these dates pushes {pending.moves.length - 1} later task{pending.moves.length > 2 ? 's' : ''}:</p>
