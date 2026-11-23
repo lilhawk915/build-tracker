@@ -4,6 +4,8 @@ const DAY = 86400000;
 export const addDays = (iso: string, n: number) =>
   new Date(Date.parse(`${iso}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
 const span = (start: string, end: string) => Math.round((Date.parse(end) - Date.parse(start)) / DAY);
+/** Whole calendar days from one ISO date to another (negative if `to` is earlier). */
+export const daysBetween = span;
 
 export interface DateChange { id: string; start_date: string; end_date: string }
 

@@ -1,5 +1,5 @@
-import { addDays } from './schedule';
-import type { BudgetLine, Task } from './types';
+import { addDays, daysBetween } from './schedule';
+import type { BudgetLine, Material, Task } from './types';
 
 // Starter list for a new house. Budgets start at $0. Durations are placeholders to edit per job.
 const STEPS: { code: string; name: string; task?: string; days?: number }[] = [
@@ -54,4 +54,38 @@ export function starterSchedule(jobId: string, start: string): Task[] {
     cursor = addDays(end, 1);
   }
   return tasks;
+}
+
+export interface PlanSource { tasks: Task[]; budget_lines: BudgetLine[]; materials: Material[] }
+export interface CopiedPlan { tasks: Task[]; budget_lines: BudgetLine[]; materials: Omit<Material, 'requested_by' | 'requested_by_name'>[] }
+
+/**
+ * Copies another job's plan onto a new job: every schedule step (same order, subs, people, notes and
+ * "starts after" links), the budget lines with their amounts, and the order list.
+ * Dates slide so the source's first step lands on `start`; gaps between steps are kept.
+ * Nothing carries over as done, contacted, confirmed, ordered or bought out.
+ */
+export function copyPlan(src: PlanSource, jobId: string, start: string): CopiedPlan {
+  const first = src.tasks.reduce<string | null>((m, t) => (!m || t.start_date < m ? t.start_date : m), null);
+  const shift = first ? daysBetween(first, start) : 0;
+  const move = (iso: string | null) => (iso ? addDays(iso, shift) : null);
+  const ids = new Map(src.tasks.map((t) => [t.id, uuid()]));
+  const tasks = [...src.tasks]
+    .sort((a, b) => a.sort - b.sort)
+    .map((t, i): Task => ({
+      id: ids.get(t.id)!, job_id: jobId, vendor_id: t.vendor_id, assigned_to: t.assigned_to ?? null, name: t.name,
+      start_date: addDays(t.start_date, shift), end_date: addDays(t.end_date, shift),
+      depends_on: t.depends_on ? ids.get(t.depends_on) ?? null : null,
+      status: 'todo', notes: t.notes, sort: i, contact_status: 'not_contacted',
+    }));
+  const budget_lines = [...src.budget_lines]
+    .sort((a, b) => a.sort - b.sort)
+    .map((l, i): BudgetLine => ({ id: uuid(), job_id: jobId, code: l.code, name: l.name, budget_cents: l.budget_cents, bought_out: false, sort: i }));
+  const materials = src.materials
+    .filter((m) => !m.requested_by)
+    .map((m) => ({
+      id: uuid(), job_id: jobId, name: m.name, quantity: m.quantity, supplier: m.supplier, order_number: '', status: 'needed' as const,
+      needed_by: first ? move(m.needed_by) : null, ordered_date: null, expected_date: null, arrived_date: null, cost_cents: null, notes: m.notes,
+    }));
+  return { tasks, budget_lines, materials };
 }

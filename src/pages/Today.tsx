@@ -5,7 +5,7 @@ import { store, useData } from '../data';
 import { attention } from '../domain/attention';
 import { rollupJob } from '../domain/budget';
 import { todayIso } from '../domain/rules';
-import { starterBudget, starterSchedule } from '../domain/templates';
+import { copyPlan, starterBudget, starterSchedule } from '../domain/templates';
 import { isNewHouse, type JobType } from '../domain/types';
 import { jobFields } from './jobFields';
 
@@ -18,6 +18,18 @@ export function Today() {
   const open = data.jobs.filter((j) => j.status !== 'closed');
   const closed = data.jobs.filter((j) => j.status === 'closed');
   const jobName = (id?: string) => data.jobs.find((j) => j.id === id)?.name;
+  // Any job with a schedule or budget can be the starting point for a new one.
+  const startOptions = [
+    { value: 'standard', label: 'Standard new-house budget and schedule' },
+    ...data.jobs
+      .filter((j) => data.tasks.some((t) => t.job_id === j.id) || data.budget_lines.some((l) => l.job_id === j.id))
+      .map((j) => {
+        const steps = data.tasks.filter((t) => t.job_id === j.id).length;
+        const budget = data.budget_lines.filter((l) => l.job_id === j.id).reduce((s, l) => s + l.budget_cents, 0);
+        return { value: `job:${j.id}`, label: `Copy ${j.name} (${steps} steps, ${money(budget)} budget)` };
+      }),
+    { value: 'blank', label: 'Nothing, start empty' },
+  ];
 
   const card = (job: (typeof data.jobs)[number]) => {
     const of = <T extends { job_id: string }>(rows: T[]) => rows.filter((r) => r.job_id === job.id);
@@ -90,15 +102,26 @@ export function Today() {
         <FormModal
           title="Add a job"
           submit="Add job"
-          fields={[...jobFields, { key: 'template', label: 'New house: start with the standard budget and schedule', type: 'check', help: 'Only applies to spec homes and client builds. Other jobs start with one General budget line.' }]}
-          initial={{ job_type: 'spec', status: 'planning', start_date: today, template: true }}
+          fields={[...jobFields, {
+            key: 'start_from', label: 'Start this job from', type: 'select', options: startOptions,
+            help: 'Copying a job brings over its steps in order, subs, budget and order list. Dates move to this job\'s start date. Nothing comes over as done, confirmed or ordered.',
+          }]}
+          initial={{ job_type: 'spec', status: 'planning', start_date: today, start_from: 'standard' }}
           onClose={() => setAdding(false)}
           onSave={async (v) => {
             const id = crypto.randomUUID();
-            const { template, ...job } = v;
+            const { start_from, ...job } = v;
+            const from = String(start_from ?? 'standard');
             const ok = await run(async () => {
               await store.insert('jobs', { ...job, id } as never);
-              if (template && isNewHouse(job.job_type as JobType)) {
+              if (from.startsWith('job:')) {
+                const src = from.slice(4);
+                const of = <T extends { job_id: string }>(rows: T[]) => rows.filter((r) => r.job_id === src);
+                const plan = copyPlan({ tasks: of(data.tasks), budget_lines: of(data.budget_lines), materials: of(data.materials) }, id, (job.start_date as string) || today);
+                if (plan.budget_lines.length) await store.insert('budget_lines', plan.budget_lines);
+                if (plan.tasks.length) await store.insert('tasks', plan.tasks);
+                if (plan.materials.length) await store.insert('materials', plan.materials as never);
+              } else if (from === 'standard' && isNewHouse(job.job_type as JobType)) {
                 await store.insert('budget_lines', starterBudget(id));
                 if (job.start_date) await store.insert('tasks', starterSchedule(id, job.start_date as string));
               } else if (!isNewHouse(job.job_type as JobType)) {

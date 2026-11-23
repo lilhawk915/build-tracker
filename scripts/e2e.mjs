@@ -131,6 +131,61 @@ await modal().getByRole('button', { name: 'Add job' }).click();
 await page.getByRole('heading', { name: 'Budget lines' }).waitFor();
 check('template loaded budget lines', await page.locator('tbody tr').count() === 25);
 
+// A new build copied from another job: same steps, subs and budget, dates moved to the new start.
+await page.goto(`${BASE}/`);
+await page.getByRole('button', { name: 'Add a job' }).click();
+const startOpts = await modal().getByLabel('Start this job from').locator('option').allInnerTexts();
+check('can start a job from another job', startOpts.some((o) => o.startsWith('Copy Oak Ridge spec')));
+await modal().getByLabel('Job name').fill('Oak Ridge copy');
+await modal().getByLabel('Start date').fill('2027-06-07');
+await modal().getByLabel('Start this job from').selectOption({ label: startOpts.find((o) => o.startsWith('Copy Oak Ridge spec')) });
+await modal().getByRole('button', { name: 'Add job' }).click();
+await page.getByRole('heading', { name: 'Budget lines' }).waitFor();
+const copyId = new URL(page.url()).pathname.split('/')[2];
+const counts = await page.evaluate(([id]) => {
+  const db = JSON.parse(localStorage.getItem('build-tracker-demo-v7') ?? '{}');
+  const of = (t) => (db[t] ?? []).filter((r) => r.job_id === id);
+  const src = (t) => (db[t] ?? []).filter((r) => r.job_id === 'oak');
+  const sum = (rows) => rows.reduce((a, r) => a + r.budget_cents, 0);
+  const first = (rows) => rows.map((r) => r.start_date).sort()[0];
+  return {
+    lines: of('budget_lines').length, srcLines: src('budget_lines').length, budget: sum(of('budget_lines')), srcBudget: sum(src('budget_lines')),
+    tasks: of('tasks').length, srcTasks: src('tasks').length, first: first(of('tasks')),
+    vendors: of('tasks').filter((t) => t.vendor_id).length, srcVendors: src('tasks').filter((t) => t.vendor_id).length,
+    done: of('tasks').filter((t) => t.status !== 'todo' || t.contact_status !== 'not_contacted').length,
+    links: of('tasks').filter((t) => t.depends_on).every((t) => of('tasks').some((x) => x.id === t.depends_on)),
+  };
+}, [copyId]);
+console.log('copy counts', JSON.stringify(counts));
+check('copied every budget line and amount', counts.lines === counts.srcLines && counts.lines > 0 && counts.budget === counts.srcBudget);
+check('copied every step with its sub', counts.tasks === counts.srcTasks && counts.tasks > 0 && counts.vendors === counts.srcVendors);
+check('copied schedule starts on the new start date', counts.first === '2027-06-07');
+check('copied steps link to each other, nothing done or confirmed', counts.links && counts.done === 0);
+await shot('04-copied-job');
+// Remove it so later checks see only the sample jobs.
+await page.getByRole('button', { name: 'Edit job' }).click();
+page.once('dialog', (d) => d.accept());
+await modal().getByRole('button', { name: 'Delete this job' }).click();
+await page.getByRole('heading', { name: 'Today' }).waitFor();
+
+// Two-week look-ahead across all jobs.
+await page.getByRole('link', { name: 'Next 2 weeks' }).click();
+await page.getByRole('heading', { name: 'Next 2 weeks' }).waitFor();
+const ahead = await text();
+check('look-ahead lists work across jobs', /Oak Ridge spec|Maple Ct custom|Cedar Lot 4/.test(ahead) && !ahead.includes('Oak Ridge copy'));
+const whoOpts = await page.getByLabel('Show').locator('option').allInnerTexts();
+const subOpt = whoOpts.find((o) => o.startsWith('Sample'));
+check('look-ahead can filter by sub', Boolean(subOpt));
+if (subOpt) {
+  await page.getByLabel('Show').selectOption({ label: subOpt });
+  await page.getByRole('button', { name: 'Their two weeks as a text' }).click();
+  const msg = await modal().getByLabel('Message').inputValue();
+  check('look-ahead writes the sub a text of their dates', msg.includes("here's what we have you down for") && /- \w{3}, \w{3} \d+/.test(msg));
+  await shot('05-lookahead-text');
+  await modal().getByRole('button', { name: 'Close' }).click();
+}
+await shot('05-lookahead');
+
 // A small job skips the house template and is ready for bills.
 await page.goto(`${BASE}/`);
 await page.getByRole('button', { name: 'Add a job' }).click();
@@ -485,7 +540,7 @@ await page.reload();
 await page.goto(`${BASE}/jobs/oak/bills`);
 check('data survives a reload', (await row('E-1').count()) === 1);
 await page.setViewportSize({ width: 390, height: 844 });
-for (const [path, name] of [['/', 'today'], ['/jobs/oak/budget', 'budget'], ['/jobs/oak/bills', 'bills'], ['/jobs/oak/schedule', 'schedule'], ['/subs', 'subs'], ['/search?q=alabaster', 'search'], ['/jobs/birch/record', 'record'], ['/jobs/birch/files', 'files'], ['/jobs/oak/materials', 'materials'], ['/calls', 'calls']]) {
+for (const [path, name] of [['/', 'today'], ['/jobs/oak/budget', 'budget'], ['/jobs/oak/bills', 'bills'], ['/jobs/oak/schedule', 'schedule'], ['/subs', 'subs'], ['/search?q=alabaster', 'search'], ['/jobs/birch/record', 'record'], ['/jobs/birch/files', 'files'], ['/jobs/oak/materials', 'materials'], ['/calls', 'calls'], ['/next', 'next']]) {
   await page.goto(`${BASE}${path}`);
   await page.locator('main h1').first().waitFor();
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

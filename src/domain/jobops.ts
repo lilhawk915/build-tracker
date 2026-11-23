@@ -85,7 +85,7 @@ export function phoneDigits(phone: string): string {
   return '';
 }
 
-const shortDate = (iso: string) => {
+export const shortDate = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 };
@@ -118,3 +118,52 @@ export function primaryContact(contacts: VendorContact[], vendorId: string | nul
 export const bestPhone = (c?: Pick<VendorContact, 'mobile' | 'office_phone'>) => c?.mobile || c?.office_phone || '';
 
 export const isRequested = (m: Pick<Material, 'status' | 'requested_by_name'>) => m.status === 'needed' && Boolean(m.requested_by_name);
+
+// ---------- two-week look-ahead ----------
+export const LOOKAHEAD_DAYS = 14;
+
+/** Monday of the week an ISO date falls in. */
+export function weekOf(iso: string): string {
+  const dow = new Date(`${iso}T00:00:00Z`).getUTCDay(); // 0 = Sunday
+  return addDays(iso, dow === 0 ? -6 : 1 - dow);
+}
+
+/** Work that isn't done and touches the next `days` days (today included), soonest first. */
+export function lookAhead(tasks: Task[], today: string, days = LOOKAHEAD_DAYS): Task[] {
+  const last = addDays(today, days - 1);
+  return tasks
+    .filter((t) => t.status !== 'done' && t.start_date <= last && t.end_date >= today)
+    .sort((a, b) => a.start_date.localeCompare(b.start_date) || a.end_date.localeCompare(b.end_date) || a.sort - b.sort);
+}
+
+/** Look-ahead rows grouped for display: work already going, then one group per week (Monday start). */
+export function lookAheadGroups(rows: Task[], today: string): { key: string; label: string; tasks: Task[] }[] {
+  const going = rows.filter((t) => t.start_date < today);
+  const weeks = new Map<string, Task[]>();
+  for (const t of rows.filter((x) => x.start_date >= today)) {
+    const w = weekOf(t.start_date);
+    weeks.set(w, [...(weeks.get(w) ?? []), t]);
+  }
+  // On a Sunday, the week you're planning is the one that starts tomorrow.
+  const thisWeek = weekOf(addDays(today, 1));
+  const label = (w: string) =>
+    w === thisWeek ? 'This week' : w === addDays(thisWeek, 7) ? 'Next week' : `Week of ${shortDate(w)}`;
+  return [
+    ...(going.length ? [{ key: 'going', label: 'Already going', tasks: going }] : []),
+    ...[...weeks.entries()].map(([w, tasks]) => ({ key: w, label: label(w), tasks })),
+  ];
+}
+
+/** Plain-text list of one person's or sub's next two weeks, ready to paste into a text. Never sent from here. */
+export function lookAheadText(opts: {
+  who: string; tasks: Pick<Task, 'job_id' | 'name' | 'start_date' | 'end_date'>[]; jobs: { id: string; name: string; address: string }[];
+}): string {
+  const lines = opts.tasks.map((t) => {
+    const job = opts.jobs.find((j) => j.id === t.job_id);
+    const place = job ? (job.address ? `${job.name} (${job.address})` : job.name) : 'Job';
+    const when = t.start_date === t.end_date ? shortDate(t.start_date) : `${shortDate(t.start_date)} to ${shortDate(t.end_date)}`;
+    return `- ${when}: ${t.name}, ${place}`;
+  });
+  const hi = opts.who ? `Hi ${opts.who}, here` : 'Here';
+  return `${hi}'s what we have you down for in the next two weeks:\n${lines.join('\n')}\nLet me know if any of these dates don't work.`;
+}
