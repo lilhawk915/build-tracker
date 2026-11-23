@@ -51,8 +51,88 @@ export function callList(tasks: Task[], today: string, windowDays = CALL_WINDOW_
 export const materialLate = (m: Pick<Material, 'status' | 'expected_date'>, today: string) =>
   m.status === 'ordered' && Boolean(m.expected_date) && m.expected_date! < today;
 
-export const needsOrdering = (m: Pick<Material, 'status' | 'needed_by'>, today: string, soonDays = 7) =>
-  m.status === 'needed' && Boolean(m.needed_by) && m.needed_by! <= addDays(today, soonDays);
+// ---------- order-by dates ----------
+/** Flag an item to order this many days before its order-by date. */
+export const ORDER_WARN_DAYS = 3;
+/** Without a lead time, flag an item this many days before it's needed. */
+export const ORDER_SOON_DAYS = 7;
+
+type Orderable = Pick<Material, 'status' | 'needed_by'> & { lead_days?: number | null; task_id?: string | null };
+type StepDates = Pick<Task, 'id' | 'start_date'>;
+
+/** The step an item is for, if it's linked to one that still exists. */
+export const stepFor = <T extends StepDates>(m: Pick<Orderable, 'task_id'>, tasks: T[]): T | undefined =>
+  m.task_id ? tasks.find((t) => t.id === m.task_id) : undefined;
+
+/** The day an item has to be on site: the start of the step it's for (so it moves with the schedule), else its own Need by date. */
+export function neededOn(m: Orderable, tasks: StepDates[]): string | null {
+  return stepFor(m, tasks)?.start_date ?? m.needed_by ?? null;
+}
+
+/** The last day to order and still have it on time: needed date minus the supplier's lead time. */
+export function orderByDate(m: Orderable, tasks: StepDates[]): string | null {
+  const need = neededOn(m, tasks);
+  return need && m.lead_days ? addDays(need, -Number(m.lead_days)) : null;
+}
+
+export interface OrderFlag { state: 'overdue' | 'now'; orderBy: string | null; need: string }
+
+/**
+ * Still to order and time to order it. With a lead time: within ORDER_WARN_DAYS of the order-by date
+ * ('now'), or past it ('overdue': it will show up after it's needed). Without a lead time: needed within
+ * ORDER_SOON_DAYS ('now').
+ */
+export function orderFlag(m: Orderable, tasks: StepDates[], today: string): OrderFlag | null {
+  if (m.status !== 'needed') return null;
+  const need = neededOn(m, tasks);
+  if (!need) return null;
+  const by = orderByDate(m, tasks);
+  if (by) {
+    if (by < today) return { state: 'overdue', orderBy: by, need };
+    return by <= addDays(today, ORDER_WARN_DAYS) ? { state: 'now', orderBy: by, need } : null;
+  }
+  return need <= addDays(today, ORDER_SOON_DAYS) ? { state: 'now', orderBy: null, need } : null;
+}
+
+export const needsOrdering = (m: Orderable, today: string, tasks: StepDates[] = []) => orderFlag(m, tasks, today) !== null;
+
+/** Ordered, but the supplier's arrival date is after the day it's needed. */
+export function arrivesTooLate(m: Orderable & Pick<Material, 'expected_date'>, tasks: StepDates[]): boolean {
+  if (m.status !== 'ordered' || !m.expected_date) return false;
+  const need = neededOn(m, tasks);
+  return Boolean(need && m.expected_date > need);
+}
+
+/** Lead time in plain words: "3 weeks", "10 days". */
+export function leadWords(days: number): string {
+  return days >= 7 && days % 7 === 0 ? `${days / 7} week${days === 7 ? '' : 's'}` : `${days} day${days === 1 ? '' : 's'}`;
+}
+
+// ---------- carrying cost ----------
+type Carry = Pick<Job, 'loan_amount_cents'> & { interest_rate?: number | null; holding_monthly_cents?: number | null };
+
+/**
+ * What one more day on a job costs to carry, in cents: interest on the full loan amount plus other
+ * monthly costs. Figured on the whole loan, so it's the most a day can cost. 0 when nothing is entered.
+ */
+export function dailyCarryCents(job: Carry): number {
+  const interest = ((Number(job.loan_amount_cents) || 0) * (Number(job.interest_rate) || 0)) / 100 / 365;
+  const other = ((Number(job.holding_monthly_cents) || 0) * 12) / 365;
+  return Math.round(interest + other);
+}
+
+/** The last finish date across the steps, or null with no steps. */
+export function finishOf(tasks: Pick<Task, 'end_date'>[]): string | null {
+  return tasks.reduce<string | null>((m, t) => (!m || t.end_date > m ? t.end_date : m), null);
+}
+
+/** How many days a set of date changes pushes the job's finish out (0 if it doesn't). */
+export function finishSlip(tasks: Task[], moves: { id: string; end_date: string }[]): number {
+  const before = finishOf(tasks);
+  const moved = new Map(moves.map((m) => [m.id, m.end_date]));
+  const after = finishOf(tasks.map((t) => ({ end_date: moved.get(t.id) ?? t.end_date })));
+  return before && after ? Math.max(0, daysBetween(before, after)) : 0;
+}
 
 export interface MaterialSummary {
   needed: number; ordered: number; arrived: number; late: number; orderedCost: number;

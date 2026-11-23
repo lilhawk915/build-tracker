@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Empty, FormModal, Modal, Status } from '../../components/ui';
+import { Empty, FormModal, Modal, money, Status } from '../../components/ui';
 import { store, useData } from '../../data';
 import { daysBetween, isLate, todayIso } from '../../domain/rules';
-import { scheduleHealth } from '../../domain/jobops';
+import { dailyCarryCents, finishSlip, scheduleHealth } from '../../domain/jobops';
 import { cascade, wouldLoop, type DateChange } from '../../domain/schedule';
 import type { Job, Task, TaskStatus } from '../../domain/types';
 
@@ -21,6 +21,8 @@ export function ScheduleTab({ job }: { job: Job }) {
   const at = (d: string) => (daysBetween(from, d) / range) * 100;
   const nowPos = at(today);
   const health = scheduleHealth(job, tasks, today);
+  const perDay = dailyCarryCents(job);
+  const behindDays = health.daysBehind || health.overTarget;
   const team = data.profiles.filter((p) => ['admin', 'staff', 'crew'].includes(p.role));
   const personName = (id?: string | null) => { const p = team.find((x) => x.id === id); return p ? p.name || p.email : ''; };
 
@@ -45,7 +47,11 @@ export function ScheduleTab({ job }: { job: Job }) {
           {health.projectedFinish && ` Projected finish ${health.projectedFinish}.`}
           {job.target_finish && ` Target ${job.target_finish}.`}
           {health.lateTasks.length > 0 && ` Late: ${health.lateTasks.map((t) => t.name).join(', ')}.`}
+          {perDay > 0 && health.state === 'behind' && behindDays > 0 && ` That's about ${money(perDay * behindDays)} more to carry.`}
         </div>
+      )}
+      {perDay > 0 && health.state !== 'done' && (
+        <p className="small"><span className="chip">About {money(perDay)} a day to carry</span> <span className="muted">Loan interest{job.holding_monthly_cents ? ' plus other monthly costs' : ''}. Every day the finish slips costs this much.</span></p>
       )}
       {tasks.length === 0 ? <Empty>Add tasks and link each to the one before it. A delay then pushes everything after it.</Empty> : (
         <div className="tablewrap">
@@ -130,6 +136,11 @@ export function ScheduleTab({ job }: { job: Job }) {
               </tbody>
             </table>
           </div>
+          {(() => {
+            const slip = finishSlip(tasks, pending.moves);
+            if (!slip) return <p className="small">The job's finish date doesn't move.</p>;
+            return <p className="small"><b>The finish moves {slip} day{slip === 1 ? '' : 's'} later.</b>{perDay > 0 && ` At about ${money(perDay)} a day, that's about ${money(perDay * slip)} more to carry.`}</p>;
+          })()}
           <p className="muted small">Weekends count as working days. Subs see their new dates in their portal, and any confirmed sub who moves goes back on the call list.</p>
           <div className="row">
             <button className="btn primary" onClick={async () => {

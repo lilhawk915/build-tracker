@@ -4,7 +4,7 @@ import type { Bill, ChangeOrder, Photo, Profile, TableName, Tables, Waiver } fro
 import { seed, type DB } from './seed';
 import { rowKey, type Store } from './store';
 
-const KEY = 'build-tracker-demo-v7';
+const KEY = 'build-tracker-demo-v8';
 const WHO = 'build-tracker-demo-who';
 const NUMBERED = new Set<TableName>(['pos', 'change_orders', 'draws']);
 const files = new Map<string, string>();
@@ -195,7 +195,7 @@ export const localStore: Store = {
       }
       if (table === 'materials') {
         for (const k of ['order_number', 'notes', 'quantity', 'supplier']) row[k] ??= '';
-        for (const k of ['needed_by', 'ordered_date', 'expected_date', 'arrived_date', 'cost_cents']) row[k] ??= null;
+        for (const k of ['needed_by', 'ordered_date', 'expected_date', 'arrived_date', 'cost_cents', 'lead_days', 'task_id']) row[k] ??= null;
         row.status ??= 'needed';
       }
       (db[table] as unknown[]).push(row);
@@ -241,6 +241,7 @@ export const localStore: Store = {
       }
       db.lien_waivers = db.lien_waivers.filter((w: Waiver) => w.bill_id !== id);
     }
+    if (table === 'tasks') for (const m of db.materials) if (m.task_id === id) m.task_id = null;
     if (table === 'jobs') {
       for (const t of ['budget_lines', 'pos', 'bills', 'change_orders', 'draws', 'lien_waivers', 'tasks', 'daily_logs', 'photos', 'selections', 'documents', 'job_steps', 'scope_items', 'materials', 'notifications'] as const) {
         (db[t] as unknown as { job_id: string }[]) = (db[t] as unknown as { job_id: string }[]).filter((r) => r.job_id !== id);

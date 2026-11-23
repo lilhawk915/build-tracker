@@ -1,5 +1,5 @@
 import { rollupLines } from './budget';
-import { CALL_WINDOW_DAYS, callList, isRequested, materialLate, needsOrdering, scheduleHealth } from './jobops';
+import { arrivesTooLate, CALL_WINDOW_DAYS, callList, dailyCarryCents, isRequested, leadWords, materialLate, neededOn, orderFlag, scheduleHealth, stepFor } from './jobops';
 import { addDays } from './schedule';
 import { coiFlag, isLate, payBlockers } from './rules';
 import type { Bill, BudgetLine, ChangeOrder, Draw, Job, Material, Photo, Po, Task, Vendor, Waiver } from './types';
@@ -56,8 +56,18 @@ export function attention(d: WorkData, today: string, money: (c: number) => stri
       if (isRequested(m)) {
         const qty = m.quantity ? `${m.quantity} ` : '';
         add(m.needed_by && m.needed_by <= addDays(today, 3) ? 'stop' : 'act', `${m.requested_by_name} asked for ${qty}${m.name}`, 'materials');
-      } else if (materialLate(m, today)) add('stop', `${m.name} was due ${m.expected_date} and hasn't arrived`, 'materials');
-      else if (needsOrdering(m, today)) add('act', `Order ${m.name}: needed by ${m.needed_by}`, 'materials');
+        continue;
+      }
+      const tasks = of(d.tasks);
+      const step = stepFor(m, tasks);
+      const forStep = step ? ` for ${step.name}` : '';
+      const flag = orderFlag(m, tasks, today);
+      if (materialLate(m, today)) add('stop', `${m.name} was due ${m.expected_date} and hasn't arrived`, 'materials');
+      else if (arrivesTooLate(m, tasks)) add('act', `${m.name} arrives ${m.expected_date}, after it's needed ${neededOn(m, tasks)}${forStep}`, 'materials');
+      else if (flag?.state === 'overdue') {
+        add('stop', `Order ${m.name} now: it takes ${leadWords(Number(m.lead_days))} and is needed ${flag.need}${forStep}. Order by was ${flag.orderBy}`, 'materials');
+      } else if (flag?.orderBy) add('act', `Order ${m.name} by ${flag.orderBy}: it takes ${leadWords(Number(m.lead_days))}, needed ${flag.need}${forStep}`, 'materials');
+      else if (flag) add('act', `Order ${m.name}: needed by ${flag.need}${forStep}`, 'materials');
     }
     const waiting = new Map<string, number>();
     for (const p of of(d.photos ?? []).filter((x) => x.review_status === 'pending')) {
@@ -66,7 +76,11 @@ export function attention(d: WorkData, today: string, money: (c: number) => stri
     }
     for (const [who, n] of waiting) add('act', `Review ${n} photo${n === 1 ? '' : 's'} from ${who}`, 'log');
     const health = scheduleHealth(job, of(d.tasks), today);
-    if (health.overTarget > 0) add('watch', `Projected to finish ${health.overTarget} days past the target`, 'schedule');
+    if (health.overTarget > 0) {
+      const perDay = dailyCarryCents(job);
+      const cost = perDay ? ` (about ${money(perDay * health.overTarget)} more to carry)` : '';
+      add('watch', `Projected to finish ${health.overTarget} days past the target${cost}`, 'schedule');
+    }
     for (const p of of(d.pos)) {
       if (p.status === 'declined') add('act', `${vendor(p.vendor_id)?.name ?? 'A sub'} declined PO ${p.number}`, 'pos');
     }

@@ -10,6 +10,8 @@ export const jobFields: FieldDef[] = [
   { key: 'sale_price_cents', label: 'Contract or expected sale price', help: 'Leave the fields below blank if they do not apply to this job.', type: 'money' },
   { key: 'loan_amount_cents', label: 'Construction loan amount', type: 'money' },
   { key: 'lender', label: 'Lender' },
+  { key: 'interest_rate', label: 'Loan interest rate (%)', type: 'number', help: 'Yearly, like 12. Used to show what each day on the job costs.' },
+  { key: 'holding_monthly_cents', label: 'Other carrying costs per month', type: 'money', help: 'Taxes, insurance, utilities. Optional.' },
   { key: 'start_date', label: 'Start date', type: 'date' },
   { key: 'target_finish', label: 'Target finish', type: 'date' },
   { key: 'finish_date', label: 'Actual finish', type: 'date' },

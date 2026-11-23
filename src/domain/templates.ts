@@ -86,6 +86,7 @@ export function copyPlan(src: PlanSource, jobId: string, start: string): CopiedP
     .map((m) => ({
       id: uuid(), job_id: jobId, name: m.name, quantity: m.quantity, supplier: m.supplier, order_number: '', status: 'needed' as const,
       needed_by: first ? move(m.needed_by) : null, ordered_date: null, expected_date: null, arrived_date: null, cost_cents: null, notes: m.notes,
+      lead_days: m.lead_days ?? null, task_id: m.task_id ? ids.get(m.task_id) ?? null : null,
     }));
   return { tasks, budget_lines, materials };
 }

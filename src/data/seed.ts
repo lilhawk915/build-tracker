@@ -127,6 +127,10 @@ export function seed(): DB {
   mat('oak', 'Exterior doors', '3', 'Sample Building Supply', 'ordered', { ordered_date: d(-12), expected_date: d(-1), cost_cents: 285000, order_number: 'SB-2210' });
   mat('oak', 'Windows', '18', 'Sample Window Co', 'ordered', { ordered_date: d(-20), expected_date: d(4), cost_cents: 960000, order_number: 'W-8830' });
   mat('oak', 'Kitchen cabinets', '1 set', 'Sample Cabinet Co', 'needed', { needed_by: d(5) });
+  // Order-by dates: items tied to the step they're for, with the supplier's lead time.
+  mat('oak', 'Vinyl siding', '28 squares', 'Sample Building Supply', 'needed', { needed_by: d(23), lead_days: 21 });
+  mat('oak', 'Interior doors', '14', 'Sample Building Supply', 'needed', { task_id: named('Interior trim').id, lead_days: 28 });
+  mat('oak', 'Countertops', '1 set', 'Sample Stone Co', 'needed', { task_id: named('Cabinets and countertops').id, lead_days: 77 });
   mat('oak', 'Baseboard trim', '40 ft', '', 'needed', { requested_by: 'demo-crew', requested_by_name: 'Jordan', notes: 'Short on the back bedroom.' });
   mat('oak', 'Backsplash tile', '60 sq ft', '', 'needed', { needed_by: d(45) });
 
@@ -144,7 +148,7 @@ export function seed(): DB {
     notes: 'Buyer loved the open kitchen. Basement stayed dry through spring rains.',
   });
   const oak = db.jobs.find((j) => j.id === 'oak')!;
-  Object.assign(oak, { plan_name: 'The Sample Two-Story', square_feet: 2400, bedrooms: 4, bathrooms: 2.5, stories: 2 });
+  Object.assign(oak, { plan_name: 'The Sample Two-Story', square_feet: 2400, bedrooms: 4, bathrooms: 2.5, stories: 2, interest_rate: 12, holding_monthly_cents: 60000 });
 
   job('deck', 'Sample St deck repair', '310 Sample St', 'repair', 'closed', 12500, 0, '2025-06-02', '2025-06-13');
   Object.assign(db.jobs.find((j) => j.id === 'deck')!, { type_note: 'Deck and railing', finish_date: '2025-06-12', client_name: 'Sample Neighbor' });

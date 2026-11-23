@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, useNavigate, useParams } from 'react-router-dom';
 import { FormModal, HealthChip, money, Status } from '../components/ui';
 import { store, useData } from '../data';
+import { dailyCarryCents } from '../domain/jobops';
 import { jobTypeLabel } from '../domain/types';
 import { BillsTab } from './tabs/BillsTab';
 import { BudgetTab } from './tabs/BudgetTab';
@@ -46,6 +47,7 @@ export function JobPage() {
             {job.address || 'No address yet'} · {jobTypeLabel(job)}
             {job.target_finish && ` · Target finish ${job.target_finish}`}
             {job.lender && ` · ${job.lender}${job.loan_amount_cents ? ` ${money(job.loan_amount_cents)}` : ''}`}
+            {job.status !== 'closed' && dailyCarryCents(job) > 0 && ` · About ${money(dailyCarryCents(job))} a day to carry`}
           </p>
         </div>
         <div className="row">

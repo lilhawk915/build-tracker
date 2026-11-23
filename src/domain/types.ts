@@ -67,6 +67,10 @@ export interface Job {
   type_note?: string; client_name?: string; client_phone?: string; client_email?: string; plan_name?: string; permit_number?: string;
   square_feet?: number | null; bedrooms?: number | null; bathrooms?: number | null; stories?: number | null;
   finish_date?: string | null;
+  /** Yearly interest rate on the construction loan, as a percent (12 = 12%). */
+  interest_rate?: number | null;
+  /** Other carrying costs per month: taxes, insurance, utilities. */
+  holding_monthly_cents?: number | null;
 }
 export interface BudgetLine {
   id: string; job_id: string; code: string; name: string; budget_cents: number; bought_out: boolean; sort: number;
@@ -122,6 +126,10 @@ export interface Material {
   id: string; job_id: string; name: string; quantity: string; supplier: string; order_number: string; status: MaterialStatus;
   needed_by: string | null; ordered_date: string | null; expected_date: string | null; arrived_date: string | null;
   cost_cents: number | null; notes: string; requested_by?: string | null; requested_by_name?: string;
+  /** Days the supplier takes from order to delivery. */
+  lead_days?: number | null;
+  /** The schedule step this item is for. Its start date is when the item is needed, so it moves with the schedule. */
+  task_id?: string | null;
 }
 export interface Notification {
   id: string; job_id: string; task_id: string | null; recipient: string; channel: 'text' | 'email' | 'call'; body: string;
