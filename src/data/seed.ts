@@ -72,6 +72,17 @@ export function seed(): DB {
     if (t.end_date < today) t.status = 'done';
     if (t.name === 'Frame house') t.vendor_id = 'framing';
   });
+  // Sub scorecard: who did the finished steps, and when they really finished (days after the promised end).
+  const finished = (job_id: string, name: string, vendor_id: string, lateBy: number) => {
+    const t = db.tasks.find((x) => x.job_id === job_id && x.name === name)!;
+    Object.assign(t, { vendor_id, promised_end: t.end_date, completed_at: `${addDays(t.end_date, lateBy)}T16:00:00` });
+  };
+  finished('oak', 'Clear lot and excavate', 'concrete', 0);
+  finished('oak', 'Pour footers and foundation', 'concrete', 3);
+  finished('maple', 'Clear lot and excavate', 'concrete', 0);
+  finished('oak', 'Utility connections', 'plumbing', 0);
+  finished('maple', 'Utility connections', 'plumbing', -1);
+  for (const t of db.tasks.filter((x) => x.status === 'in_progress')) t.promised_end = t.end_date;
 
   const po = (id: string, job_id: string, vendor_id: string, code: string, number: number, description: string, dollars: number, status: Tables['pos']['status']) =>
     db.pos.push({ id, job_id, vendor_id, budget_line_id: lineId[job_id][code], number, description, amount_cents: dollars * 100, approved_co_cents: 0, status });

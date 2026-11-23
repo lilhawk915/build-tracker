@@ -107,6 +107,10 @@ export interface Task {
   id: string; job_id: string; vendor_id: string | null; name: string; start_date: string; end_date: string;
   depends_on: string | null; status: TaskStatus; notes: string; sort: number;
   assigned_to?: string | null; contact_status: ContactStatus;
+  /** When the step was marked done. Set by the database. */
+  completed_at?: string | null;
+  /** The end date as it stood when the step started: the finish the sub is held to. Set by the database. */
+  promised_end?: string | null;
 }
 export interface DailyLog { id: string; job_id: string; log_date: string; weather: string; notes: string; author: string }
 export interface Photo {

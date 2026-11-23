@@ -143,7 +143,7 @@ await modal().getByRole('button', { name: 'Add job' }).click();
 await page.getByRole('heading', { name: 'Budget lines' }).waitFor();
 const copyId = new URL(page.url()).pathname.split('/')[2];
 const counts = await page.evaluate(([id]) => {
-  const db = JSON.parse(localStorage.getItem('build-tracker-demo-v9') ?? '{}');
+  const db = JSON.parse(localStorage.getItem('build-tracker-demo-v10') ?? '{}');
   const of = (t) => (db[t] ?? []).filter((r) => r.job_id === id);
   const src = (t) => (db[t] ?? []).filter((r) => r.job_id === 'oak');
   const sum = (rows) => rows.reduce((a, r) => a + r.budget_cents, 0);
@@ -381,6 +381,15 @@ await modal().getByLabel('Status').selectOption('in_progress');
 await modal().getByRole('button', { name: 'Save task' }).click();
 await page.getByText('Task saved').waitFor();
 check('finished checklist lets the step start', (await row('Rough inspections and insulation').first().innerText()).includes('Checklist 6/6'));
+const tracked = () => page.evaluate(() => JSON.parse(localStorage.getItem('build-tracker-demo-v10')).tasks.find((t) => t.job_id === 'oak' && t.name === 'Rough inspections and insulation'));
+let ins = await tracked();
+check('starting a step records the finish it is held to', ins.promised_end === ins.end_date && !ins.completed_at);
+await row('Rough inspections and insulation').first().getByRole('button', { name: 'Edit' }).click();
+await modal().getByLabel('Status').selectOption('done');
+await modal().getByRole('button', { name: 'Save task' }).click();
+await page.getByText('Task saved').waitFor();
+ins = await tracked();
+check('finishing a step records when', Boolean(ins.completed_at) && ins.promised_end === ins.end_date);
 await row('Paint').first().getByRole('button', { name: 'Add checklist' }).click();
 check('step with no list offers to add one', (await modal().innerText()).includes('No checklist on this step yet'));
 await modal().getByLabel('Add an item').fill('Caulk every trim joint');
@@ -617,12 +626,47 @@ await shot('33-portal-photos');
 await page.getByLabel('Viewing as').selectOption('demo-admin');
 await page.getByRole('heading', { name: 'Today' }).waitFor();
 
+// Sub scorecard.
+await page.goto(`${BASE}/subs`);
+await page.getByRole('heading', { name: 'Scorecard' }).waitFor();
+const card = page.getByRole('region', { name: 'Scorecard' });
+const cardRow = (n) => card.locator('tr', { hasText: n });
+const plumb = await cardRow('Sample Plumbing').innerText();
+check('scorecard grades a sub who finishes on time', plumb.includes('Strong') && plumb.includes('100%'));
+const conc = await cardRow('Sample Concrete').innerText();
+check('scorecard flags a sub who runs late', conc.includes('Watch') && conc.includes('67%') && conc.includes('3'));
+const frm = await cardRow('Sample Framing Co').innerText();
+check('a sub with no scored steps has no grade yet', frm.includes('Not enough work yet'));
+check('problems sort to the top', (await card.locator('tbody tr').first().innerText()).includes('Sample Concrete'));
+await cardRow('Sample Concrete').getByRole('button', { name: 'Details' }).click();
+const det = await modal().innerText();
+check('scorecard details list each finished step', det.includes('Pour footers and foundation') && det.includes('3 days late') && det.includes('On time'));
+await shot('34-scorecard');
+await modal().getByRole('button', { name: 'Close' }).last().click();
+
+// Monday summary.
+await page.getByRole('link', { name: 'Monday summary' }).click();
+await page.getByRole('heading', { name: 'Monday summary' }).waitFor();
+const oakWeek = await page.getByRole('region', { name: 'Oak Ridge spec' }).innerText();
+const weekAll = await text();
+check('summary shows each open job', ['Oak Ridge spec', 'Maple Ct custom', 'Cedar Lot 4'].every((x) => weekAll.includes(x)));
+check('summary has what got done and what is on this week', oakWeek.includes('Finished: Rough inspections and insulation') && oakWeek.includes('This week') && oakWeek.includes('Frame house'));
+check('summary prices the days behind', /about \$[\d,.]+ more to carry/.test(oakWeek));
+check('summary lists what to order and problems', oakWeek.includes('Order') && oakWeek.includes('Countertops') && oakWeek.includes('Problems'));
+check('summary leaves closed jobs out', !weekAll.includes('Birch'));
+await shot('35-monday-summary');
+await page.getByRole('button', { name: 'Copy as text' }).click();
+const share = await modal().getByLabel('Summary').inputValue();
+check('summary copies as text', share.startsWith('Week of') && share.includes('OAK RIDGE SPEC') && share.includes('Finished: Rough inspections and insulation'));
+check('summary text says nothing is sent', (await modal().innerText()).includes('Nothing is sent from here'));
+await modal().getByRole('button', { name: 'Close' }).last().click();
+
 // Reload keeps data. Phone width has no sideways page scroll.
 await page.reload();
 await page.goto(`${BASE}/jobs/oak/bills`);
 check('data survives a reload', (await row('E-1').count()) === 1);
 await page.setViewportSize({ width: 390, height: 844 });
-for (const [path, name] of [['/', 'today'], ['/jobs/oak/budget', 'budget'], ['/jobs/oak/bills', 'bills'], ['/jobs/oak/schedule', 'schedule'], ['/subs', 'subs'], ['/search?q=alabaster', 'search'], ['/jobs/birch/record', 'record'], ['/jobs/birch/files', 'files'], ['/jobs/oak/materials', 'materials'], ['/calls', 'calls'], ['/next', 'next']]) {
+for (const [path, name] of [['/', 'today'], ['/jobs/oak/budget', 'budget'], ['/jobs/oak/bills', 'bills'], ['/jobs/oak/schedule', 'schedule'], ['/subs', 'subs'], ['/search?q=alabaster', 'search'], ['/jobs/birch/record', 'record'], ['/jobs/birch/files', 'files'], ['/jobs/oak/materials', 'materials'], ['/calls', 'calls'], ['/next', 'next'], ['/week', 'week']]) {
   await page.goto(`${BASE}${path}`);
   await page.locator('main h1').first().waitFor();
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

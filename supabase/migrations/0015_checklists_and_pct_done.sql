@@ -15,6 +15,7 @@ create index on public.step_checks (task_id);
 alter table public.step_checks enable row level security;
 create policy staff_all on public.step_checks for all to authenticated using (private.is_staff()) with check (private.is_staff());
 revoke all on public.step_checks from anon;
+grant select, insert, update, delete on public.step_checks to authenticated;
 
 -- How much of each budget line's work is done.
 alter table public.budget_lines add column pct_complete smallint check (pct_complete is null or pct_complete between 0 and 100);

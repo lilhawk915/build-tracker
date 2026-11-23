@@ -4,7 +4,7 @@ import type { Bill, ChangeOrder, Photo, Profile, TableName, Tables, Waiver } fro
 import { seed, type DB } from './seed';
 import { rowKey, type Store } from './store';
 
-const KEY = 'build-tracker-demo-v9';
+const KEY = 'build-tracker-demo-v10';
 const WHO = 'build-tracker-demo-who';
 const NUMBERED = new Set<TableName>(['pos', 'change_orders', 'draws']);
 const files = new Map<string, string>();
@@ -33,6 +33,15 @@ function load(): DB {
 const save = () => storage(KEY, JSON.stringify(memory));
 const who = () => storage(WHO) ?? 'demo-admin';
 const me = (): Profile => load().profiles.find((p) => p.id === who()) ?? load().profiles[0];
+
+/** Same rule as the database's task_track_finish: when a step finished, and the end date it was held to. */
+function trackFinish(row: Record<string, unknown>, before: Record<string, unknown> | null) {
+  if (row.status === 'done') {
+    row.completed_at = !before || before.status !== 'done' ? row.completed_at ?? new Date().toISOString() : before.completed_at ?? row.completed_at ?? null;
+  } else row.completed_at = null;
+  if (row.status === 'todo') row.promised_end = null;
+  else row.promised_end ??= before ? before.end_date : row.end_date;
+}
 
 function crewJobs(db: DB, id: string) {
   const open = new Set(db.jobs.filter((j) => j.status !== 'closed').map((j) => j.id));
@@ -185,7 +194,7 @@ export const localStore: Store = {
         const d = db.markup_defaults[0];
         db.estimate_markups.push({ estimate_id: row.id as string, sales_tax_pct: d.sales_tax_pct, contingency_pct: d.contingency_pct, overhead_pct: d.overhead_pct, profit_pct: d.profit_pct, profit_amount: null });
       }
-      if (table === 'tasks') row.contact_status ??= 'not_contacted';
+      if (table === 'tasks') { row.contact_status ??= 'not_contacted'; trackFinish(row, null); }
       if (table === 'step_checks') { row.done ??= false; row.done_at ??= null; row.done_by ??= ''; row.sort ??= 0; }
       if (table === 'budget_lines') { row.code ??= ''; row.bought_out ??= false; row.budget_cents ??= 0; row.sort ??= 0; }
       if (table === 'photos') {
@@ -224,6 +233,7 @@ export const localStore: Store = {
       const before = { ...row };
       Object.assign(row, patch);
       if (['start_date', 'end_date', 'vendor_id'].some((k) => row[k] !== before[k])) row.contact_status = 'not_contacted';
+      trackFinish(row, before);
     } else {
       Object.assign(row, patch);
     }
@@ -290,7 +300,9 @@ export const localStore: Store = {
     const p = me();
     const t = db.tasks.find((x) => x.id === id && (p.role === 'crew' ? x.assigned_to === p.id : x.vendor_id === p.vendor_id));
     if (!t) throw new Error('This task is not assigned to you.');
+    const before = { ...t };
     t.status = status as typeof t.status;
+    trackFinish(t as unknown as Record<string, unknown>, before as unknown as Record<string, unknown>);
     save();
   },
   async crewMaterials() {

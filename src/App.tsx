@@ -13,6 +13,7 @@ import { InvoicePage } from './pages/invoices/InvoicePage';
 import { InvoicesPage } from './pages/invoices/InvoicesPage';
 import { CallsPage } from './pages/CallsPage';
 import { LookAheadPage } from './pages/LookAheadPage';
+import { WeekPage } from './pages/WeekPage';
 import { CrewHome } from './pages/CrewHome';
 import { DrawSheetPage } from './pages/DrawSheetPage';
 import { JobPage } from './pages/JobPage';
@@ -49,6 +50,7 @@ function Shell({ me, onSignOut }: { me: Profile; onSignOut: () => void }) {
         <nav aria-label="Main">
           {staff && <NavLink to="/" end>Today</NavLink>}
           {me.role === 'admin' && <NavLink to="/leads">Leads</NavLink>}
+          {staff && <NavLink to="/week">Monday summary</NavLink>}
           {staff && <NavLink to="/next">Next 2 weeks</NavLink>}
           {staff && <NavLink to="/calls">Call list</NavLink>}
           {staff && <NavLink to="/estimates">Estimates</NavLink>}
@@ -100,6 +102,7 @@ function Shell({ me, onSignOut }: { me: Profile; onSignOut: () => void }) {
                 <Route path="/invoices" element={me.role === 'admin' ? <InvoicesPage /> : <div className="alert">Invoices are for admins.</div>} />
                 <Route path="/invoices/:invoiceId" element={me.role === 'admin' ? <InvoicePage /> : <div className="alert">Invoices are for admins.</div>} />
                 <Route path="/next" element={<LookAheadPage />} />
+                <Route path="/week" element={<WeekPage />} />
                 <Route path="/calls" element={<CallsPage />} />
                 {canSeeContacts(me) && <Route path="/texts" element={<AutoTextsPage />} />}
                 <Route path="/subs" element={<Subs />} />

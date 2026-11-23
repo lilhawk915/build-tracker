@@ -4,6 +4,7 @@ import { store, useData } from '../data';
 import { bestPhone, primaryContact } from '../domain/jobops';
 import { coiFlag, todayIso } from '../domain/rules';
 import { canSeeContacts, type Vendor, type VendorContact } from '../domain/types';
+import { SubScorecard } from './SubScorecard';
 
 function ContactsModal({ vendor, onClose }: { vendor: Vendor; onClose: () => void }) {
   const { data, run } = useData();
@@ -154,6 +155,7 @@ export function Subs() {
           </table>
         </div>
       )}
+      {vendors.length > 0 && <SubScorecard />}
       {edit && (
         <FormModal
           title={edit === 'new' ? 'Add a sub' : `Edit ${edit.name}`}
