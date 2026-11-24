@@ -80,7 +80,7 @@ describe('attention', () => {
   it('says when to order and that a past order-by is a stop', () => {
     const tasks = [task('frame', '2026-12-20', '2026-12-30', { name: 'Frame house' })];
     const soon = attention({ ...base, jobs: [job()], tasks, materials: [mat({ task_id: 'frame', lead_days: 21 })] }, '2026-11-27', money);
-    expect(soon[0]).toMatchObject({ severity: 'act', label: 'Order Trusses by 2026-11-29: it takes 3 weeks, needed 2026-12-20 for Frame house' });
+    expect(soon[0]).toMatchObject({ severity: 'act', label: 'Order Trusses by Nov 29: it takes 3 weeks, needed Dec 20 for Frame house' });
     const late = attention({ ...base, jobs: [job()], tasks, materials: [mat({ task_id: 'frame', lead_days: 21 })] }, '2026-12-01', money);
     expect(late[0].severity).toBe('stop');
     expect(late[0].label).toContain('Order Trusses now');

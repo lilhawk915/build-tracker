@@ -140,7 +140,7 @@ describe('payment gate', () => {
     expect(payBlockers(vendor('2026-11-01'), [w('received')], 'b', '2026-11-01')).toEqual([]);
   });
   it('blocks expired insurance, missing insurance, and missing waivers', () => {
-    expect(payBlockers(vendor('2026-10-31'), [w('received')], 'b', '2026-11-01')).toEqual(['insurance expired 2026-10-31']);
+    expect(payBlockers(vendor('2026-10-31'), [w('received')], 'b', '2026-11-01')).toEqual(['insurance expired Oct 31']);
     expect(payBlockers(vendor(null), [w('received')], 'b', '2026-11-01')).toEqual(['no insurance certificate on file']);
     expect(payBlockers(vendor('2026-12-01'), [w('requested')], 'b', '2026-11-01')).toEqual(['no lien waiver received']);
   });

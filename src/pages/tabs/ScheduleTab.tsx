@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Empty, FormModal, Modal, money, Status } from '../../components/ui';
 import { store, useData } from '../../data';
-import { daysBetween, isLate, todayIso } from '../../domain/rules';
-import { dailyCarryCents, finishSlip, scheduleHealth } from '../../domain/jobops';
+import { daysBetween, isLate, todayIso, niceDate } from '../../domain/rules';
+import { dailyCarryCents, finishSlip, scheduleHealth, shortDate } from '../../domain/jobops';
 import { checkStatus, standardChecksFor, startBlocker } from '../../domain/checks';
 import { ChecklistModal } from './ChecklistModal';
+import { InspectionsPanel } from './InspectionsPanel';
+import { holdingUp, inspectionBlocker } from '../../domain/inspections';
 import { cascade, wouldLoop, type DateChange } from '../../domain/schedule';
 import type { Job, Task, TaskStatus } from '../../domain/types';
 
@@ -14,6 +16,7 @@ export function ScheduleTab({ job }: { job: Job }) {
   const [pending, setPending] = useState<{ task: Task; values: Partial<Task>; moves: DateChange[] } | null>(null);
   const [checking, setChecking] = useState<Task | null>(null);
   const checks = data.step_checks.filter((c) => c.job_id === job.id);
+  const inspections = data.inspections.filter((i) => i.job_id === job.id);
   const missingStandard = standardChecksFor(data.tasks.filter((t) => t.job_id === job.id && t.status !== 'done'), checks);
   const today = todayIso();
   const tasks = data.tasks.filter((t) => t.job_id === job.id).sort((a, b) => a.start_date.localeCompare(b.start_date) || a.sort - b.sort);
@@ -54,8 +57,8 @@ export function ScheduleTab({ job }: { job: Job }) {
       {health.state !== 'none' && (
         <div className={`alert ${health.state === 'behind' ? '' : 'calm'}`}>
           <b>{health.label}.</b>
-          {health.projectedFinish && ` Projected finish ${health.projectedFinish}.`}
-          {job.target_finish && ` Target ${job.target_finish}.`}
+          {health.projectedFinish && ` Projected finish ${niceDate(health.projectedFinish)}.`}
+          {job.target_finish && ` Target ${niceDate(job.target_finish)}.`}
           {health.lateTasks.length > 0 && ` Late: ${health.lateTasks.map((t) => t.name).join(', ')}.`}
           {perDay > 0 && health.state === 'behind' && behindDays > 0 && ` That's about ${money(perDay * behindDays)} more to carry.`}
         </div>
@@ -63,38 +66,41 @@ export function ScheduleTab({ job }: { job: Job }) {
       {perDay > 0 && health.state !== 'done' && (
         <p className="small"><span className="chip">About {money(perDay)} a day to carry</span> <span className="muted">Loan interest{job.holding_monthly_cents ? ' plus other monthly costs' : ''}. Every day the finish slips costs this much.</span></p>
       )}
+      <InspectionsPanel job={job} />
       {tasks.length === 0 ? <Empty>Add tasks and link each to the one before it. A delay then pushes everything after it.</Empty> : (
         <div className="tablewrap">
-          <table className="gantt">
-            <thead><tr><th>Task</th><th>Who</th><th>Dates</th><th>Status</th><th>{from} to {to}</th><th /></tr></thead>
+          <table className="gantt cards">
+            <thead><tr><th>Task</th><th>Who</th><th>Dates</th><th>Status</th><th>{niceDate(from)} to {niceDate(to)}</th><th /></tr></thead>
             <tbody>
               {tasks.map((t) => {
                 const late = isLate(t, today);
                 return (
                   <tr key={t.id}>
-                    <td>{t.name}{t.depends_on && <div className="muted small">After {taskName(t.depends_on)}</div>}</td>
-                    <td>{vendorName(t.vendor_id)}{t.assigned_to && <div className="small muted">{personName(t.assigned_to)}</div>}</td>
-                    <td className="num small">{t.start_date}<br />{t.end_date}</td>
+                    <td className="cardtitle">{t.name}{t.depends_on && <div className="muted small">After {taskName(t.depends_on)}</div>}</td>
+                    <td>{vendorName(t.vendor_id) || (!t.assigned_to && <span className="muted small phoneonly-inline">No one set</span>)}{t.assigned_to && <div className="small muted">{personName(t.assigned_to)}</div>}</td>
+                    <td className="num small">{t.start_date === t.end_date ? niceDate(t.start_date) : <>{niceDate(t.start_date)}<span className="deskonly-inline"><br /></span><span className="phoneonly-inline"> to </span>{niceDate(t.end_date)}</>}</td>
                     <td>
                       {late ? <span className="flag">Late</span> : <Status s={t.status} />}
                       {(() => {
                         const c = checkStatus(checks, t.id);
                         if (!c.total) return null;
-                        return <div><button className={`chip ${c.complete ? 'good' : 'warn'}`} style={{ cursor: 'pointer', marginTop: 4 }} onClick={() => setChecking(t)}>Checklist {c.done}/{c.total}</button></div>;
+                        return <div><button className={`chip ${c.complete ? 'good' : 'warn'}`} style={{ cursor: 'pointer', marginTop: 4 }} onClick={() => setChecking(t)} aria-label={`Checklist for ${t.name}: ${c.done} of ${c.total} done`}>Checklist {c.done}/{c.total}</button></div>;
                       })()}
+                      {t.status === 'todo' && holdingUp(t.id, inspections).map((i) => (
+                        <div key={i.id}><span className={`chip ${i.result === 'failed' ? 'bad' : 'warn'}`} style={{ marginTop: 4 }}>{i.name} inspection: {i.result === 'scheduled' && i.scheduled_date ? shortDate(i.scheduled_date) : i.result === 'failed' ? 'failed' : 'not scheduled'}</span></div>
+                      ))}
                     </td>
                     <td className="barcell">
                       <div className="track">
                         <div
                           className={`bar ${late ? 'late' : t.status}`}
                           style={{ left: `${at(t.start_date)}%`, width: `${((daysBetween(t.start_date, t.end_date) + 1) / range) * 100}%` }}
-                          title={`${t.name}: ${t.start_date} to ${t.end_date}`}
+                          title={`${t.name}: ${niceDate(t.start_date)} to ${niceDate(t.end_date)}`}
                         />
                         {nowPos >= 0 && nowPos <= 100 && <div className="now" style={{ left: `${nowPos}%` }} aria-hidden="true" />}
                       </div>
                     </td>
                     <td className="actions">
-                      <button className="btn tiny" onClick={() => setChecking(t)}>{checkStatus(checks, t.id).total ? 'Checklist' : 'Add checklist'}</button>
                       <button className="btn tiny" onClick={() => setEdit(t)}>Edit</button>
                     </td>
                   </tr>
@@ -121,15 +127,20 @@ export function ScheduleTab({ job }: { job: Job }) {
           initial={edit === 'new' ? { status: 'todo', start_date: today, end_date: today, vendor_id: '', assigned_to: '', depends_on: '' } : { ...edit, vendor_id: edit.vendor_id ?? '', assigned_to: edit.assigned_to ?? '', depends_on: edit.depends_on ?? '' }}
           onClose={() => setEdit(null)}
           intro={edit !== 'new' ? (
-            <button type="button" className="btn danger tiny" style={{ justifySelf: 'start' }} onClick={async () => {
-              if (await run(() => store.remove('tasks', edit.id), 'Task deleted.')) setEdit(null);
-            }}>Delete this task</button>
+            <div className="row">
+              <button type="button" className="btn tiny" onClick={() => { setChecking(edit); setEdit(null); }}>
+                {checkStatus(checks, edit.id).total ? 'Open the walk-through checklist' : 'Add a walk-through checklist'}
+              </button>
+              <button type="button" className="btn danger tiny" onClick={async () => {
+                if (await run(() => store.remove('tasks', edit.id), 'Task deleted.')) setEdit(null);
+              }}>Delete this task</button>
+            </div>
           ) : undefined}
           onSave={async (v) => {
             const values = { ...v, vendor_id: (v.vendor_id as string) || null, assigned_to: (v.assigned_to as string) || null, depends_on: (v.depends_on as string) || null } as Partial<Task>;
             if ((values.end_date as string) < (values.start_date as string)) throw new Error('Finish must be on or after start.');
             if (edit !== 'new' && values.status !== 'todo' && edit.status === 'todo') {
-              const block = startBlocker(edit, checks);
+              const block = startBlocker(edit, checks) ?? inspectionBlocker(edit, inspections);
               if (block) throw new Error(block);
             }
             if (edit === 'new') {
@@ -156,7 +167,7 @@ export function ScheduleTab({ job }: { job: Job }) {
               <thead><tr><th>Task</th><th>New start</th><th>New finish</th></tr></thead>
               <tbody>
                 {pending.moves.filter((m) => m.id !== pending.task.id).map((m) => (
-                  <tr key={m.id}><td>{taskName(m.id)}</td><td className="num">{m.start_date}</td><td className="num">{m.end_date}</td></tr>
+                  <tr key={m.id}><td>{taskName(m.id)}</td><td className="num">{niceDate(m.start_date)}</td><td className="num">{niceDate(m.end_date)}</td></tr>
                 ))}
               </tbody>
             </table>

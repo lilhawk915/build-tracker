@@ -1,3 +1,4 @@
+import { niceDate } from '../../domain/rules';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Empty, FormModal, Status } from '../../components/ui';
@@ -73,7 +74,7 @@ export function EstimatesPage() {
                   <td>{e.address}</td>
                   <td>{workTypeText(e)}</td>
                   <td><Status s={e.status === 'won' ? 'approved' : e.status === 'lost' ? 'rejected' : e.status === 'sent' ? 'sent' : 'pending'} /> <span className="small">{STATUS_WORD[e.status]}</span></td>
-                  <td className="num small">{e.quote_date}</td>
+                  <td className="num small">{niceDate(e.quote_date)}</td>
                   <td className="right num">{priced.lines.length}</td>
                   <td className="right num">{usd(isAdmin ? priced.totals.grandTotal : priced.totals.material + priced.totals.labor)}</td>
                   {isAdmin && <td className={`right num${e.status === 'lost' ? ' muted' : ''}`}>{usd(priced.totals.profit)}</td>}

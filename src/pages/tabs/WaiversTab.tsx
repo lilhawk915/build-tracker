@@ -1,3 +1,4 @@
+import { niceDate } from '../../domain/rules';
 import { useState } from 'react';
 import { Empty, FileLink, FormModal, money, Status, WAIVER_LABEL } from '../../components/ui';
 import { store, useData } from '../../data';
@@ -29,7 +30,7 @@ export function WaiversTab({ job }: { job: Job }) {
                   <td>{WAIVER_LABEL[w.kind]}</td>
                   <td>{invoice(w.bill_id)}</td>
                   <td className="right num">{money(w.amount_cents)}</td>
-                  <td className="num">{w.through_date}</td>
+                  <td className="num">{niceDate(w.through_date)}</td>
                   <td><Status s={w.status} /></td>
                   <td className="actions">
                     {w.file_path && <FileLink path={w.file_path} />}

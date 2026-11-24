@@ -3,7 +3,7 @@ import { Empty, FormModal, money, Status } from '../../components/ui';
 import { store, useData } from '../../data';
 import { arrivesTooLate, isRequested, leadWords, materialLate, neededOn, orderByDate, orderFlag, parseMaterialLines, stepFor, summarizeMaterials } from '../../domain/jobops';
 import { addDays } from '../../domain/schedule';
-import { todayIso } from '../../domain/rules';
+import { todayIso, niceDate } from '../../domain/rules';
 import type { Job, Material, MaterialStatus } from '../../domain/types';
 
 const WORD: Record<MaterialStatus, string> = { needed: 'Needed', ordered: 'On order', arrived: 'Arrived' };
@@ -20,7 +20,7 @@ export function MaterialsTab({ job }: { job: Job }) {
   const when = (m: Material) => (m.status === 'needed' ? orderByDate(m, steps) ?? neededOn(m, steps) : m.expected_date ?? neededOn(m, steps)) ?? '';
   const rows = all.filter((m) => !show || m.status === show)
     .sort((a, b) => Number(isRequested(b)) - Number(isRequested(a)) || a.status.localeCompare(b.status) || when(a).localeCompare(when(b)));
-  const stepOptions = [{ value: '', label: 'No step, use the Need by date' }, ...steps.map((t) => ({ value: t.id, label: `${t.name} (starts ${t.start_date})` }))];
+  const stepOptions = [{ value: '', label: 'No step, use the Need by date' }, ...steps.map((t) => ({ value: t.id, label: `${t.name} (starts ${niceDate(t.start_date)})` }))];
   const orderFields = [
     { key: 'task_id', label: 'Needed for step', type: 'select' as const, options: stepOptions, help: 'Needed by the day this step starts. Moves when the schedule moves.' },
     { key: 'lead_days', label: 'Lead time in days', type: 'number' as const, help: 'From order to delivery. Trusses about 21, windows 28 to 42.' },
@@ -62,19 +62,19 @@ export function MaterialsTab({ job }: { job: Job }) {
       </label>
       {rows.length === 0 ? <Empty>{all.length ? 'Nothing in this view.' : 'Add what this job needs to buy. You can paste a whole list at once.'}</Empty> : (
         <div className="tablewrap">
-          <table>
+          <table className="cards">
             <thead><tr><th>Item</th><th>Qty</th><th>Supplier</th><th>Order no.</th><th>Status</th><th>Need by</th><th>Order by</th><th>Ordered</th><th>Arriving</th><th>Arrived</th><th className="right">Cost</th><th /></tr></thead>
             <tbody>
               {rows.map((m) => (
                 <tr key={m.id}>
-                  <td>
+                  <td className="cardtitle">
                     <b>{m.name}</b>
                     {isRequested(m) && <div><span className="flag">Asked for by {m.requested_by_name}</span></div>}
                     {m.notes && <div className="small muted">{m.notes}</div>}
                   </td>
-                  <td>{m.quantity}</td>
-                  <td>{m.supplier}</td>
-                  <td className="num small">{m.order_number}</td>
+                  <td data-label="Qty">{m.quantity}</td>
+                  <td data-label="Supplier">{m.supplier}</td>
+                  <td className="num small" data-label="Order no.">{m.order_number}</td>
                   <td>
                     {materialLate(m, today) ? <span className="flag">Late</span>
                       : arrivesTooLate(m, steps) ? <span className="flag">Arrives too late</span>
@@ -82,12 +82,12 @@ export function MaterialsTab({ job }: { job: Job }) {
                       : orderFlag(m, steps, today) ? <span className="flag">Order now</span>
                       : <span className={`chip ${m.status === 'arrived' ? 'good' : m.status === 'ordered' ? 'warn' : ''}`}>{WORD[m.status]}</span>}
                   </td>
-                  <td className="num small">{neededOn(m, steps)}{stepFor(m, steps) && <div className="muted">{stepFor(m, steps)!.name}</div>}</td>
-                  <td className="num small">{m.status === 'needed' && orderByDate(m, steps)}{m.lead_days ? <div className="muted">{leadWords(Number(m.lead_days))}</div> : null}</td>
-                  <td className="num small">{m.ordered_date}</td>
-                  <td className="num small">{m.status === 'ordered' ? m.expected_date : ''}</td>
-                  <td className="num small">{m.arrived_date}</td>
-                  <td className="right num">{m.cost_cents != null ? money(m.cost_cents) : ''}</td>
+                  <td className="num small" data-label="Need by">{niceDate(neededOn(m, steps))}{stepFor(m, steps) && <div className="muted">{stepFor(m, steps)!.name}</div>}</td>
+                  <td className="num small" data-label="Order by">{m.status === 'needed' && niceDate(orderByDate(m, steps))}{m.lead_days ? <div className="muted">{leadWords(Number(m.lead_days))}</div> : null}</td>
+                  <td className="num small" data-label="Ordered">{niceDate(m.ordered_date)}</td>
+                  <td className="num small" data-label="Arriving">{m.status === 'ordered' ? niceDate(m.expected_date) : ''}</td>
+                  <td className="num small" data-label="Arrived">{niceDate(m.arrived_date)}</td>
+                  <td className="right num" data-label="Cost">{m.cost_cents != null ? money(m.cost_cents) : ''}</td>
                   <td className="actions">
                     {m.status === 'needed' && <button className="btn tiny" onClick={() => setOrdering(m)}>Mark ordered</button>}
                     {m.status === 'ordered' && <button className="btn tiny" onClick={() => run(() => store.update('materials', m.id, { status: 'arrived', arrived_date: today }), `${m.name} marked arrived.`)}>Mark arrived</button>}

@@ -1,3 +1,4 @@
+import { niceDate } from '../../domain/rules';
 import { useState } from 'react';
 import { Empty, FileLink, FormModal } from '../../components/ui';
 import { store, useData } from '../../data';
@@ -21,7 +22,7 @@ export function FilesTable({ rows, onEdit }: { rows: Document[]; onEdit?: (d: Do
               <td>{d.category}</td>
               <td><b>{d.title}</b>{d.notes && <div className="small muted">{d.notes}</div>}</td>
               <td>{d.revision}</td>
-              <td className="num">{d.doc_date}</td>
+              <td className="num">{niceDate(d.doc_date)}</td>
               <td className="small muted">{d.file_name}</td>
               <td className="actions noprint">
                 <FileLink path={d.file_path} label="Open" />

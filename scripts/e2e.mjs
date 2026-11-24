@@ -14,6 +14,14 @@ const shot = (n) => page.screenshot({ path: `${out}/${n}.png`, fullPage: true })
 const text = () => page.locator('main').innerText();
 const row = (t) => page.locator('tr', { hasText: t });
 const modal = () => page.getByRole('dialog');
+// Job pages sit in four areas: open the area, then the page inside it.
+const AREA = { 'Job record': 'Overview', 'What it needs': 'Overview', 'Site log': 'Overview', Schedule: 'Schedule', Contractors: 'Schedule', Materials: 'Schedule',
+  Budget: 'Money', Bills: 'Money', POs: 'Money', 'Change orders': 'Money', Draws: 'Money', 'Lien waivers': 'Money', Invoices: 'Money',
+  'Drawings and files': 'Files', 'Colors and selections': 'Files' };
+const tab = async (name) => {
+  await page.locator('.tabgroups').getByRole('link', { name: AREA[name], exact: true }).click();
+  await page.locator('.tabs').getByRole('link', { name, exact: true }).click();
+};
 
 await page.goto(BASE);
 await page.getByRole('heading', { name: 'Today' }).waitFor();
@@ -31,7 +39,7 @@ check('framing row figures', ['$62,000', '$67,500', '$52,000', '$30,000', '$5,50
 await shot('02-budget');
 
 // Payment gate: framing bill F-218 is approved but its waiver is missing.
-await page.locator('.tabs').getByRole('link', { name: 'Bills', exact: true }).click();
+await tab('Bills');
 const f218 = row('F-218');
 check('blocked bill says why', (await f218.innerText()).includes('no lien waiver received'));
 await f218.getByRole('button', { name: 'Pay' }).click();
@@ -42,25 +50,25 @@ await modal().getByRole('button', { name: 'Cancel' }).click();
 // Approve plumbing: a waiver request appears.
 await row('P-77').getByRole('button', { name: 'Approve' }).click();
 await page.getByText('Bill approved').waitFor();
-await page.locator('.tabs').getByRole('link', { name: 'Lien waivers', exact: true }).click();
+await tab('Lien waivers');
 check('approval requested a waiver', (await row('Sample Plumbing').innerText()).includes('Requested'));
 // Receive framing waiver, then pay it.
 await row('F-218').filter({ hasText: 'Requested' }).getByRole('button', { name: 'Mark received' }).click();
 await modal().getByRole('button', { name: 'Mark received' }).click();
 await page.getByText('Waiver marked received').waitFor();
-await page.locator('.tabs').getByRole('link', { name: 'Bills', exact: true }).click();
+await tab('Bills');
 await row('F-218').getByRole('button', { name: 'Pay' }).click();
 check('pay dialog clear once waiver is in', (await modal().innerText()).includes('This only records the payment'));
 await modal().getByRole('button', { name: 'Record payment' }).click();
 await page.getByText('Payment recorded').waitFor();
 check('bill shows paid', (await row('F-218').innerText()).includes('Paid'));
-await page.locator('.tabs').getByRole('link', { name: 'Lien waivers', exact: true }).click();
+await tab('Lien waivers');
 check('payment requested the unconditional waiver', await row('F-218').filter({ hasText: 'Unconditional progress' }).filter({ hasText: 'Requested' }).count() === 1);
 
 // Expired insurance: override needs a reason, and it is saved.
-await page.locator('.tabs').getByRole('link', { name: 'POs', exact: true }).click();
+await tab('POs');
 await row('Rough and finish electrical').getByRole('button', { name: 'Mark accepted' }).click();
-await page.locator('.tabs').getByRole('link', { name: 'Bills', exact: true }).click();
+await tab('Bills');
 await page.getByRole('button', { name: 'Add a bill' }).click();
 await modal().getByLabel('Sub').selectOption({ label: 'Sample Electric' });
 await modal().getByLabel('PO', { exact: true }).selectOption({ label: 'PO 4: Sample Electric, $17,500' });
@@ -80,7 +88,7 @@ await page.getByText('Payment recorded').waitFor();
 check('override reason is on the bill', (await row('E-1').innerText()).includes('Emergency repair'));
 
 // Schedule delay pushes later work.
-await page.locator('.tabs').getByRole('link', { name: 'Schedule', exact: true }).click();
+await tab('Schedule');
 await page.getByRole('heading', { name: 'Schedule' }).waitFor();
 await shot('04-schedule');
 const beforeRoof = await page.getByRole('row', { name: /^Dry-in and roof/ }).innerText();
@@ -96,10 +104,18 @@ await page.getByText(/later tasks? moved/).waitFor();
 check('roof task moved', (await page.getByRole('row', { name: /^Dry-in and roof/ }).innerText()) !== beforeRoof);
 
 // Draw: new draft, amounts, sheet.
-await page.locator('.tabs').getByRole('link', { name: 'Draws', exact: true }).click();
-await page.getByRole('button', { name: 'Start a draw' }).click();
+await tab('Draws');
+let drawsText = await text();
+check('draws warn when drawn ahead of the work', /Draws are \$[\d,]+ ahead of the work done/.test(drawsText));
+check('draws offer the finished work not drawn yet', (await page.getByRole('button', { name: /Start a draw for \$[\d,]+ of finished work/ }).count()) === 1);
+await page.getByRole('button', { name: 'Start a blank draw' }).click();
 await page.getByText('Draft draw added').waitFor();
+check('only one draft at a time', (await page.getByRole('button', { name: 'Start a blank draw' }).count()) === 0 && (await text()).includes('is a draft'));
 await row('Draft').getByRole('button', { name: 'Enter amounts' }).click();
+await modal().getByRole('button', { name: 'Fill from % done' }).click();
+check('fill from % done skips lines already drawn past the work', (await modal().getByLabel('Framing this draw').inputValue()) === '');
+check('fill from % done asks for finished lines', (await modal().getByLabel('Permits and fees this draw').inputValue()) !== '');
+check('draw editor shows % done and work done', /work done/i.test(await modal().innerText()));
 await modal().getByLabel('Framing this draw').fill('30000');
 check('warns when a draw passes budget', (await modal().innerText()).includes('Over budget'));
 await shot('06-draw');
@@ -116,10 +132,10 @@ await page.goto(`${BASE}/`);
 await page.locator('.jobcard', { hasText: 'Maple Ct custom' }).click();
 await page.getByRole('heading', { name: 'Budget lines' }).waitFor();
 const before = await page.locator('dl.strip').innerText();
-await page.locator('.tabs').getByRole('link', { name: 'Change orders', exact: true }).click();
+await tab('Change orders');
 await row('Quartz').getByRole('button', { name: 'Approve' }).click();
 await page.getByText('Budget updated').waitFor();
-await page.locator('.tabs').getByRole('link', { name: 'Budget', exact: true }).click();
+await tab('Budget');
 const after = await page.locator('dl.strip').innerText();
 check('client change order adds to the price', before.includes('$540,000') && after.includes('$547,500'));
 
@@ -143,7 +159,7 @@ await modal().getByRole('button', { name: 'Add job' }).click();
 await page.getByRole('heading', { name: 'Budget lines' }).waitFor();
 const copyId = new URL(page.url()).pathname.split('/')[2];
 const counts = await page.evaluate(([id]) => {
-  const db = JSON.parse(localStorage.getItem('build-tracker-demo-v10') ?? '{}');
+  const db = JSON.parse(localStorage.getItem('build-tracker-demo-v11') ?? '{}');
   const of = (t) => (db[t] ?? []).filter((r) => r.job_id === id);
   const src = (t) => (db[t] ?? []).filter((r) => r.job_id === 'oak');
   const sum = (rows) => rows.reduce((a, r) => a + r.budget_cents, 0);
@@ -198,15 +214,15 @@ await modal().getByRole('button', { name: 'Add job' }).click();
 await page.getByRole('heading', { name: 'Budget lines' }).waitFor();
 check('small job gets one General line, no house schedule', await page.locator('tbody tr').count() === 1 && (await row('General').count()) === 1);
 check('job header shows the type and note', (await text()).includes('Other: Garage door swap'));
-await page.locator('.tabs').getByRole('link', { name: 'Schedule', exact: true }).click();
+await tab('Schedule');
 check('small job has no starter tasks', (await text()).includes('Add tasks and link'));
-await page.locator('.tabs').getByRole('link', { name: 'Bills', exact: true }).click();
+await tab('Bills');
 check('small job can take a bill right away', await page.getByRole('button', { name: 'Add a bill' }).isEnabled());
 
 // Search every job.
 const find = async (q) => {
   await page.goto(`${BASE}/search?q=${encodeURIComponent(q)}`);
-  await page.getByRole('heading', { name: 'All jobs' }).waitFor();
+  await page.getByRole('heading', { name: 'Jobs', exact: true }).waitFor();
   return text();
 };
 t = await find('');
@@ -316,7 +332,7 @@ await modal().getByLabel('Order number').fill('ORD-99');
 await modal().getByLabel('Cost').fill('1000');
 await modal().getByRole('button', { name: 'Mark ordered' }).click();
 await page.getByText('marked ordered').waitFor();
-check('order details show arrival date', (await row('2x4x8 studs').innerText()).includes('2030-01-15'));
+check('order details show arrival date', (await row('2x4x8 studs').innerText()).includes('Jan 15, 2030'));
 check('ordered total went up', (await text()).includes('$24,850'));
 await row('2x4x8 studs').getByRole('button', { name: 'Mark arrived' }).click();
 await page.getByText('marked arrived').waitFor();
@@ -328,11 +344,11 @@ check('filter shows only on-order items', !(await text()).includes('2x4x8 studs'
 await page.goto(`${BASE}/`);
 t = await text();
 check('past order-by is flagged on today', t.includes('Order Countertops now: it takes 11 weeks') && t.includes('for Cabinets and countertops'));
-check('order-by coming up is flagged on today', /Order Vinyl siding by \d{4}-\d{2}-\d{2}: it takes 3 weeks, needed \d{4}-\d{2}-\d{2}/.test(t));
+check('order-by coming up is flagged on today', /Order Vinyl siding by [A-Z][a-z]{2} \d{1,2}(, \d{4})?: it takes 3 weeks, needed [A-Z][a-z]{2} \d{1,2}(, \d{4})?/.test(t));
 await page.goto(`${BASE}/jobs/oak/materials`);
 await page.getByRole('heading', { name: 'Materials' }).waitFor();
 check('countertops say past order-by', (await row('Countertops').innerText()).includes('Past order-by'));
-check('interior doors show step, order-by and lead time', /Interior trim[\s\S]*\d{4}-\d{2}-\d{2}[\s\S]*4 weeks/.test(await row('Interior doors').innerText()));
+check('interior doors show step, order-by and lead time', /Interior trim[\s\S]*[A-Z][a-z]{2} \d{1,2}(, \d{4})?[\s\S]*4 weeks/.test(await row('Interior doors').innerText()));
 check('interior doors not flagged yet', !(await row('Interior doors').innerText()).includes('Order now'));
 await shot('22b-order-by');
 await row('Interior doors').getByRole('button', { name: 'Edit' }).click();
@@ -369,19 +385,53 @@ await modal().getByRole('button', { name: 'Save task' }).click();
 await page.getByText('Finish the walk-through checklist for Rough inspections and insulation first: 0 of 6 done.').waitFor();
 check('step with an unfinished checklist cannot start', true);
 await modal().getByRole('button', { name: 'Cancel' }).click();
-await row('Rough inspections and insulation').first().getByRole('button', { name: 'Checklist', exact: true }).click();
+await row('Rough inspections and insulation').first().getByRole('button', { name: /^Checklist for Rough inspections and insulation/ }).click();
 const boxes = modal().getByRole('checkbox');
 check('checklist modal lists the items', (await boxes.count()) === 6 && (await modal().innerText()).includes('Blocking in for cabinets'));
 for (let i = 0; i < 6; i++) { await boxes.nth(i).check(); await page.waitForTimeout(150); }
 check('ticked items show who and when', (await modal().innerText()).includes('6 of 6 done') && (await modal().innerText()).includes('Owner'));
 await shot('23c-checklist');
 await modal().getByRole('button', { name: 'Close' }).last().click();
+// Inspections hold the step too.
+check('step shows the inspections it waits on', (await row('Rough inspections and insulation').first().innerText()).includes('Framing inspection: not scheduled'));
+await row('Rough inspections and insulation').first().getByRole('button', { name: 'Edit' }).click();
+await modal().getByLabel('Status').selectOption('in_progress');
+await modal().getByRole('button', { name: 'Save task' }).click();
+await page.getByText("Rough inspections and insulation can't start until these inspections pass: Framing, Rough plumbing, electric and HVAC.").waitFor();
+check('step waiting on inspections cannot start', true);
+await modal().getByRole('button', { name: 'Cancel' }).click();
+const insp = page.getByRole('region', { name: 'Inspections' });
+const inspRow = (n) => insp.locator('li', { hasText: n });
+const inspText = await insp.innerText();
+check('job has the standard inspections', ['Footer', 'Framing', 'Rough plumbing, electric and HVAC', 'Insulation', 'Final', 'Passed'].every((x) => inspText.includes(x)));
+await inspRow('Framing').getByRole('button', { name: 'Schedule' }).click();
+await modal().getByLabel('Inspector or office').fill('Sample County Building');
+await modal().getByRole('button', { name: 'Save date' }).click();
+await page.getByText('Framing inspection scheduled').waitFor();
+await inspRow('Framing').getByRole('button', { name: 'Failed' }).click();
+await modal().getByLabel('What has to be fixed').fill('Missing hurricane ties on the back wall');
+await modal().getByLabel('Whose work').selectOption({ label: 'Sample Framing Co' });
+await modal().getByRole('button', { name: 'Save' }).click();
+await page.getByText('Framing inspection marked failed').waitFor();
+check('failed inspection says what to fix', (await inspRow('Framing').innerText()).includes('To fix: Missing hurricane ties'));
+await inspRow('Framing').getByRole('button', { name: 'Schedule re-inspection' }).click();
+await modal().getByRole('button', { name: 'Save date' }).click();
+await page.getByText('Framing inspection scheduled').waitFor();
+await inspRow('Framing').getByRole('button', { name: 'Passed' }).click();
+await page.getByText('Framing inspection passed').waitFor();
+await inspRow('Rough plumbing').getByRole('button', { name: 'Schedule' }).click();
+await modal().getByRole('button', { name: 'Save date' }).click();
+await page.getByText('inspection scheduled').waitFor();
+await inspRow('Rough plumbing').getByRole('button', { name: 'Passed' }).click();
+await page.getByText('Rough plumbing, electric and HVAC inspection passed').waitFor();
+check('passed re-inspection remembers the failure', (await inspRow('Framing').innerText()).includes('failed once before'));
+await shot('23d-inspections');
 await row('Rough inspections and insulation').first().getByRole('button', { name: 'Edit' }).click();
 await modal().getByLabel('Status').selectOption('in_progress');
 await modal().getByRole('button', { name: 'Save task' }).click();
 await page.getByText('Task saved').waitFor();
 check('finished checklist lets the step start', (await row('Rough inspections and insulation').first().innerText()).includes('Checklist 6/6'));
-const tracked = () => page.evaluate(() => JSON.parse(localStorage.getItem('build-tracker-demo-v10')).tasks.find((t) => t.job_id === 'oak' && t.name === 'Rough inspections and insulation'));
+const tracked = () => page.evaluate(() => JSON.parse(localStorage.getItem('build-tracker-demo-v11')).tasks.find((t) => t.job_id === 'oak' && t.name === 'Rough inspections and insulation'));
 let ins = await tracked();
 check('starting a step records the finish it is held to', ins.promised_end === ins.end_date && !ins.completed_at);
 await row('Rough inspections and insulation').first().getByRole('button', { name: 'Edit' }).click();
@@ -390,7 +440,8 @@ await modal().getByRole('button', { name: 'Save task' }).click();
 await page.getByText('Task saved').waitFor();
 ins = await tracked();
 check('finishing a step records when', Boolean(ins.completed_at) && ins.promised_end === ins.end_date);
-await row('Paint').first().getByRole('button', { name: 'Add checklist' }).click();
+await row('Paint').first().getByRole('button', { name: 'Edit' }).click();
+await modal().getByRole('button', { name: 'Add a walk-through checklist' }).click();
 check('step with no list offers to add one', (await modal().innerText()).includes('No checklist on this step yet'));
 await modal().getByLabel('Add an item').fill('Caulk every trim joint');
 await modal().getByRole('button', { name: 'Add', exact: true }).click();
@@ -413,6 +464,7 @@ await page.getByText('Line saved').waitFor();
 check('spending ahead of the work is flagged on the line', (await row('Foundation').first().innerText()).includes('98% spent, 50% done'));
 await shot('23d-budget-pct');
 await page.goto(`${BASE}/`);
+await page.getByText(/Keep an eye on/).click();
 check('today warns when spending runs ahead', (await text()).includes('Foundation is 50% done but has used 98% of its budget'));
 await page.goto(`${BASE}/jobs/oak/schedule`);
 await page.getByRole('heading', { name: 'Schedule' }).waitFor();
@@ -645,7 +697,8 @@ await shot('34-scorecard');
 await modal().getByRole('button', { name: 'Close' }).last().click();
 
 // Monday summary.
-await page.getByRole('link', { name: 'Monday summary' }).click();
+await page.getByRole('button', { name: /More/ }).click();
+await page.getByRole('menuitem', { name: 'Monday summary' }).click();
 await page.getByRole('heading', { name: 'Monday summary' }).waitFor();
 const oakWeek = await page.getByRole('region', { name: 'Oak Ridge spec' }).innerText();
 const weekAll = await text();

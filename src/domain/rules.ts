@@ -5,11 +5,20 @@ export const todayIso = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** A date the way people say it: "Dec 2", with the year only when it isn't this year ("Jan 14, 2027"). */
+export function niceDate(iso: string | null | undefined, today = todayIso()): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  return `${MONTHS[m - 1]} ${d}${String(y) === today.slice(0, 4) ? '' : `, ${y}`}`;
+}
+
 // The same gate the database enforces in bill_before_update. Returns the reasons a bill can't be paid.
 export function payBlockers(vendor: Vendor | undefined, waivers: Waiver[], billId: string, paidDate: string): string[] {
   const out: string[] = [];
   if (!vendor?.coi_expires) out.push('no insurance certificate on file');
-  else if (vendor.coi_expires < paidDate) out.push(`insurance expired ${vendor.coi_expires}`);
+  else if (vendor.coi_expires < paidDate) out.push(`insurance expired ${niceDate(vendor.coi_expires, paidDate)}`);
   if (!waivers.some((w) => w.bill_id === billId && w.status === 'received')) out.push('no lien waiver received');
   return out;
 }
@@ -34,7 +43,7 @@ export const daysBetween = (a: string, b: string) =>
 export function coiFlag(v: Vendor, today: string): Flag | null {
   if (!v.coi_expires) return { severity: 'watch', label: `${v.name}: no insurance certificate on file` };
   const left = daysBetween(today, v.coi_expires);
-  if (left < 0) return { severity: 'stop', label: `${v.name}: insurance expired ${v.coi_expires}` };
+  if (left < 0) return { severity: 'stop', label: `${v.name}: insurance expired ${niceDate(v.coi_expires, today)}` };
   if (left <= 30) return { severity: 'watch', label: `${v.name}: insurance expires in ${left} days` };
   return null;
 }

@@ -89,7 +89,7 @@ export function SearchPage() {
 
   return (
     <div className="stack">
-      <h1>All jobs</h1>
+      <h1>Jobs</h1>
       <input
         type="search"
         className="bigsearch"

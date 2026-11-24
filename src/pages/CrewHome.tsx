@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Empty, FileLink, FormModal, Status } from '../components/ui';
 import { store, useData } from '../data';
 import { materialLate } from '../domain/jobops';
-import { isLate, todayIso } from '../domain/rules';
+import { isLate, todayIso, niceDate } from '../domain/rules';
 import type { TaskStatus } from '../domain/types';
 
 const mapLink = (address: string) => `https://maps.apple.com/?q=${encodeURIComponent(address)}`;
@@ -26,7 +26,7 @@ export function CrewHome() {
           <div>
             <b>{t.name}</b> {isLate(t, today) && <span className="flag">Late</span>}
             <div className="muted small">{jobName(t.job_id)}</div>
-            <div className="num small">{t.start_date} to {t.end_date}</div>
+            <div className="num small">{niceDate(t.start_date)} to {niceDate(t.end_date)}</div>
             {t.notes && <div className="small">{t.notes}</div>}
           </div>
           <label className="field">
@@ -67,7 +67,7 @@ export function CrewHome() {
               <h3>Coming up</h3>
               {schedule.length === 0 ? <p className="muted small">No open tasks.</p> : schedule.map((t) => (
                 <p key={t.id} className="small" style={{ marginTop: 6 }}>
-                  <span className="num">{t.start_date}</span> {t.name}{t.assigned_to === me.id && ' (you)'}
+                  <span className="num">{niceDate(t.start_date)}</span> {t.name}{t.assigned_to === me.id && ' (you)'}
                 </p>
               ))}
             </div>

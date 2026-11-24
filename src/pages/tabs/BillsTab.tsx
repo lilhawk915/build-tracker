@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { downloadCsv, Empty, FileLink, FormModal, money, Status } from '../../components/ui';
 import { store, useData } from '../../data';
 import { centsToDecimal, toCsv } from '../../domain/csv';
-import { payBlockers, todayIso } from '../../domain/rules';
+import { payBlockers, todayIso, niceDate } from '../../domain/rules';
 import { safeFileName } from '../../data/store';
 import type { Bill, Job } from '../../domain/types';
 
@@ -37,23 +37,23 @@ export function BillsTab({ job }: { job: Job }) {
       </div>
       {bills.length === 0 ? <Empty>No bills yet. Subs can submit bills from their portal, or add one here.</Empty> : (
         <div className="tablewrap">
-          <table>
-            <thead><tr><th>Date</th><th>Sub</th><th>Invoice</th><th>Budget line</th><th className="right">Amount</th><th>Status</th><th>Can it be paid?</th><th /></tr></thead>
+          <table className="cards">
+            <thead><tr><th>Sub</th><th>Date</th><th>Invoice</th><th>Budget line</th><th className="right">Amount</th><th>Status</th><th>Can it be paid?</th><th /></tr></thead>
             <tbody>
               {bills.map((b) => {
                 const blocks = b.status === 'approved' ? payBlockers(vendor(b.vendor_id), data.lien_waivers, b.id, todayIso()) : [];
                 return (
                   <tr key={b.id}>
-                    <td className="num">{b.bill_date}</td>
-                    <td>{vendor(b.vendor_id)?.name}</td>
-                    <td>{b.invoice_no}</td>
-                    <td>{line(b.budget_line_id)}</td>
-                    <td className="right num">{money(b.amount_cents)}</td>
+                    <td className="cardtitle">{vendor(b.vendor_id)?.name}<span className="phoneonly-inline num"> · {money(b.amount_cents)}</span></td>
+                    <td className="num" data-label="Date">{niceDate(b.bill_date)}</td>
+                    <td data-label="Invoice">{b.invoice_no}</td>
+                    <td data-label="Line">{line(b.budget_line_id)}</td>
+                    <td className="right num deskcell">{money(b.amount_cents)}</td>
                     <td><Status s={b.status} /></td>
                     <td className="small">
                       {b.status === 'approved' && (blocks.length ? <span className="flag">Blocked</span> : <span className="chip good">Ready</span>)}
                       {blocks.map((x) => <div key={x} className="muted">{x}</div>)}
-                      {b.status === 'paid' && <span className="muted">Paid {b.paid_date}</span>}
+                      {b.status === 'paid' && <span className="muted">Paid {niceDate(b.paid_date)}</span>}
                       {b.override_reason && <div className="muted">Override: {b.override_reason}</div>}
                       {b.status === 'rejected' && b.notes && <span className="muted">{b.notes}</span>}
                     </td>

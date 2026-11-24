@@ -1,6 +1,6 @@
 import { poTotal } from './budget';
 import { daysBetween, isLate } from './rules';
-import type { Bill, ChangeOrder, Photo, Po, Task, Vendor } from './types';
+import type { Bill, ChangeOrder, Inspection, Photo, Po, Task, Vendor } from './types';
 
 /** The local calendar day of a timestamp, so a step finished at 9 PM isn't counted as the next day. */
 export const localDay = (ts: string) => {
@@ -41,6 +41,8 @@ export interface SubScore {
   lateNow: Task[];
   /** Photos sent back to be fixed. */
   redos: number;
+  /** Times an inspection failed on their work. */
+  failedInspections: number;
   /** Purchase orders billed past their amount. */
   overPo: number;
   /** Approved change orders on their purchase orders, and what they added. */
@@ -53,7 +55,7 @@ export interface SubScore {
 }
 
 export interface ScoreData {
-  vendors: Vendor[]; tasks: Task[]; photos: Photo[]; pos: Po[]; bills: Bill[]; change_orders: ChangeOrder[];
+  vendors: Vendor[]; tasks: Task[]; photos: Photo[]; pos: Po[]; bills: Bill[]; change_orders: ChangeOrder[]; inspections?: Inspection[];
 }
 
 export function subScore(vendor: Vendor, d: ScoreData, today: string): SubScore {
@@ -66,12 +68,13 @@ export function subScore(vendor: Vendor, d: ScoreData, today: string): SubScore 
   const poIds = new Set(pos.map((p) => p.id));
   const cos = d.change_orders.filter((c) => c.status === 'approved' && c.po_id && poIds.has(c.po_id) && c.cost_delta_cents > 0);
   const redos = d.photos.filter((p) => p.vendor_id === vendor.id && p.review_status === 'rejected').length;
+  const failedInspections = (d.inspections ?? []).filter((i) => i.vendor_id === vendor.id).reduce((s, i) => s + i.fail_count, 0);
   const onTime = rated.length - lateDays.length;
   const onTimePct = rated.length ? Math.round((onTime / rated.length) * 100) : null;
   let grade: Grade = 'new';
   if (rated.length >= MIN_RATED && onTimePct !== null) {
-    if (onTimePct < BAD_BELOW || redos >= 2) grade = 'bad';
-    else if (onTimePct >= GOOD_AT && redos === 0 && overPo === 0) grade = 'good';
+    if (onTimePct < BAD_BELOW || redos + failedInspections >= 2) grade = 'bad';
+    else if (onTimePct >= GOOD_AT && redos + failedInspections === 0 && overPo === 0) grade = 'good';
     else grade = 'watch';
   }
   return {
@@ -79,7 +82,7 @@ export function subScore(vendor: Vendor, d: ScoreData, today: string): SubScore 
     avgDaysLate: lateDays.length ? Math.round(lateDays.reduce((s, n) => s + n, 0) / lateDays.length) : 0,
     unrated: tasks.filter((t) => t.status === 'done' && !t.completed_at).length,
     lateNow: tasks.filter((t) => isLate(t, today)),
-    redos, overPo, extras: cos.length, extrasCents: cos.reduce((s, c) => s + c.cost_delta_cents, 0),
+    redos, failedInspections, overPo, extras: cos.length, extrasCents: cos.reduce((s, c) => s + c.cost_delta_cents, 0),
     billedCents: bills.reduce((s, b) => s + b.amount_cents, 0),
     onTimePct, grade,
   };

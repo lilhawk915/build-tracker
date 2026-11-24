@@ -337,3 +337,66 @@ tr.notincluded td:first-child { opacity: 1; }
 .weekjob h2 { margin: 0; }
 .weekjob h3 { font-size: 15px; margin: 6px 0 2px; }
 @media print { .weekjob { break-inside: avoid; border: 0; padding: 8px 0; } }
+
+/* Inspections */
+.inspections { list-style: none; padding: 0; margin: 0; display: grid; gap: 0; }
+.inspections li { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--rule); }
+.inspections li:first-child { border-top: 0; }
+.inspections .actions { flex-wrap: wrap; gap: 6px; }
+
+/* Main menu: a few daily pages, the rest under More. On a phone, one Menu button. */
+.menubtn { display: none; margin-left: auto; background: transparent; color: #fff; border: 1.5px solid #6d7a73; border-radius: 3px; font: 600 15px/1 var(--body); padding: 9px 14px; min-height: 40px; cursor: pointer; }
+.topbar nav .phoneonly { display: none; }
+.topbar .more { position: relative; display: flex; }
+.topbar .morebtn { background: none; border: 0; border-bottom: 3px solid transparent; color: #cfd6d1; font: 500 16px/1 var(--body); padding: 16px 12px; cursor: pointer; }
+.topbar .morebtn:hover, .topbar .morebtn.active { color: #fff; }
+.topbar .morebtn.active { border-bottom-color: var(--tape); }
+.topbar .morelist { position: absolute; top: 100%; left: 0; z-index: 30; background: var(--ink); border: 1px solid #3a4741; border-radius: 0 0 3px 3px; min-width: 200px; display: grid; padding: 6px 0; box-shadow: 0 8px 18px rgba(0,0,0,.25); }
+.topbar .morelist a { padding: 12px 16px; border-bottom: 0; }
+.topbar .morelist a.active { color: var(--tape); }
+@media (max-width: 860px) {
+  .topbar { padding-top: 8px; padding-bottom: 8px; }
+  .menubtn { display: inline-flex; align-items: center; }
+  .topbar nav { display: none; flex-basis: 100%; order: 5; }
+  .topbar nav.open { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding-bottom: 8px; }
+  .topbar nav a { padding: 13px 4px; border-bottom: 1px solid #2f3a35; }
+  .topbar nav a.active { border-bottom-color: var(--tape); }
+  .topbar nav .phoneonly { display: block; }
+  .topbar .deskonly { display: none; }
+}
+
+/* Job areas, then the pages inside the area */
+.tabgroups { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 18px 0 0; }
+.tabgroups a { text-align: center; padding: 12px 8px; font: 600 19px/1 var(--display); text-decoration: none; color: var(--ink); background: var(--board); border: 1.5px solid var(--rule); border-radius: 3px; }
+.tabgroups a.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+.tabgroups a:hover:not(.active) { border-color: var(--ink); }
+.tabgroups + .tabs { margin-top: 10px; }
+.tabgroups + :not(.tabs) { margin-top: 20px; }
+@media (max-width: 600px) { .tabgroups a { font-size: 16px; padding: 12px 2px; } .tabs a { font-size: 16px; padding: 9px 10px; } }
+@media print { .tabgroups { display: none !important; } }
+
+/* Tables that turn into cards on a phone */
+.phoneonly-inline { display: none; }
+@media (max-width: 700px) {
+  .phoneonly-inline { display: inline; }
+  .deskonly-inline { display: none; }
+  table.cards thead { display: none; }
+  table.cards, table.cards tbody, table.cards tr, table.cards td { display: block; width: auto; }
+  table.cards tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px 10px; padding: 12px 14px; border-bottom: 1px solid var(--rule); }
+  table.cards tr:has(> td.actions) { grid-template-columns: minmax(0, 1fr) auto; }
+  table.cards td:not(.actions) { grid-column: 1; }
+  table.cards td.cardtitle { order: -1; }
+  table.cards td { padding: 0; border: 0; }
+  table.cards td.barcell { display: none; }
+  table.cards.gantt { min-width: 0; }
+  table.cards td.actions { grid-column: 2; grid-row: 1 / span 4; align-self: start; }
+  table.cards td.cardtitle { font-size: 17px; font-weight: 600; }
+  table.cards td.cardtitle .small { font-weight: 400; }
+  table.cards td[data-label]::before { content: attr(data-label) ": "; color: var(--steel); font-size: 13px; }
+  table.cards td:empty { display: none; }
+  table.cards td.deskcell { display: none; }
+  .tablewrap:has(table.cards) { overflow-x: visible; }
+}
+.watchlist summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+.watchlist .needs { margin-top: 6px; }
+@media (max-width: 860px) { .today > section[aria-label="Needs you"] { order: -1; } }

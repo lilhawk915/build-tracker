@@ -1,3 +1,4 @@
+import { niceDate } from '../domain/rules';
 import { Link, useParams } from 'react-router-dom';
 import { money, WAIVER_LABEL } from '../components/ui';
 import { useData } from '../data';
@@ -31,20 +32,21 @@ export function DrawSheetPage() {
           <p>{job.address}</p>
           <p className="muted">
             {job.lender && `Lender: ${job.lender}. `}Loan: {money(job.loan_amount_cents)}.
-            {draw.requested_date && ` Requested ${draw.requested_date}.`}
+            {draw.requested_date && ` Requested ${niceDate(draw.requested_date)}.`}
           </p>
           {draw.notes && <p>{draw.notes}</p>}
         </div>
         {sheet.some((s) => s.overdrawn) && <div className="alert">One or more lines would be drawn past their budget.</div>}
         <div className="tablewrap">
           <table>
-            <thead><tr><th>Code</th><th>Line</th><th className="right">Budget</th><th className="right">Prior draws</th><th className="right">This draw</th><th className="right">Total drawn</th><th className="right">Balance</th></tr></thead>
+            <thead><tr><th>Code</th><th>Line</th><th className="right">Budget</th><th className="right">% done</th><th className="right">Prior draws</th><th className="right">This draw</th><th className="right">Total drawn</th><th className="right">Balance</th></tr></thead>
             <tbody>
               {sheet.map((s) => (
                 <tr key={s.line.id}>
                   <td className="num">{s.line.code}</td>
                   <td>{s.line.name}</td>
                   <td className="right num">{money(s.budget)}</td>
+                  <td className="right num">{s.line.pct_complete == null ? '' : `${s.line.pct_complete}%`}</td>
                   <td className="right num">{money(s.prior)}</td>
                   <td className="right num">{s.thisDraw ? money(s.thisDraw) : ''}</td>
                   <td className="right num">{money(s.total)}</td>
@@ -56,6 +58,7 @@ export function DrawSheetPage() {
               <tr>
                 <td /><td>Total</td>
                 <td className="right num">{money(add((s) => s.budget))}</td>
+                <td />
                 <td className="right num">{money(add((s) => s.prior))}</td>
                 <td className="right num">{money(add((s) => s.thisDraw))}</td>
                 <td className="right num">{money(add((s) => s.total))}</td>
@@ -72,7 +75,7 @@ export function DrawSheetPage() {
                 <thead><tr><th>Sub</th><th>Type</th><th>Through</th><th className="right">Amount</th></tr></thead>
                 <tbody>
                   {waivers.map((w) => (
-                    <tr key={w.id}><td>{vendor(w.vendor_id)}</td><td>{WAIVER_LABEL[w.kind]}</td><td className="num">{w.through_date}</td><td className="right num">{money(w.amount_cents)}</td></tr>
+                    <tr key={w.id}><td>{vendor(w.vendor_id)}</td><td>{WAIVER_LABEL[w.kind]}</td><td className="num">{niceDate(w.through_date)}</td><td className="right num">{money(w.amount_cents)}</td></tr>
                   ))}
                 </tbody>
               </table>

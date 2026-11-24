@@ -81,6 +81,16 @@ export interface BudgetLine {
 export interface StepCheck {
   id: string; job_id: string; task_id: string; label: string; done: boolean; done_at: string | null; done_by: string; sort: number;
 }
+/** A county inspection. task_id is the step that can't start until it passes. */
+export interface Inspection {
+  id: string; job_id: string; task_id: string | null; name: string;
+  result: 'not_scheduled' | 'scheduled' | 'passed' | 'failed' | 'not_needed';
+  scheduled_date: string | null; result_date: string | null; inspector: string; notes: string;
+  /** Whose work failed the last time it failed. */
+  vendor_id: string | null;
+  /** How many times it has failed. */
+  fail_count: number; sort: number;
+}
 export interface Po {
   id: string; job_id: string; vendor_id: string; budget_line_id: string; number: number; description: string;
   amount_cents: number; approved_co_cents: number; status: PoStatus;
@@ -183,7 +193,7 @@ export interface LeadAppointment {
 export interface Tables {
   vendors: Vendor; profiles: Profile; team_invites: Invite; jobs: Job; budget_lines: BudgetLine; pos: Po; bills: Bill;
   change_orders: ChangeOrder; draws: Draw; draw_lines: DrawLine; lien_waivers: Waiver; tasks: Task;
-  daily_logs: DailyLog; photos: Photo; selections: Selection; documents: Document; job_steps: JobStep; step_checks: StepCheck;
+  daily_logs: DailyLog; photos: Photo; selections: Selection; documents: Document; job_steps: JobStep; step_checks: StepCheck; inspections: Inspection;
   scope_items: ScopeItem; materials: Material; notifications: Notification; vendor_contacts: VendorContact;
   auto_text_settings: AutoTextSettings; auto_texts: AutoTextLog;
   estimates: EstimateRow; estimate_markups: MarkupsRow; estimate_versions: EstimateVersionRow; catalog_items: CatalogRow;

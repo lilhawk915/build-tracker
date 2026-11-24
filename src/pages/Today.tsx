@@ -1,9 +1,10 @@
 import { standardChecksFor } from '../domain/checks';
+import { standardInspectionsFor } from '../domain/inspections';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Empty, FormModal, HealthChip, money, Status, Tape, TapeLegend } from '../components/ui';
 import { store, useData } from '../data';
-import { attention } from '../domain/attention';
+import { attention, type Attention } from '../domain/attention';
 import { rollupJob } from '../domain/budget';
 import { todayIso } from '../domain/rules';
 import { copyPlan, starterBudget, starterSchedule } from '../domain/templates';
@@ -16,6 +17,8 @@ export function Today() {
   const [adding, setAdding] = useState(false);
   const today = todayIso();
   const needs = attention(data, today, money);
+  const urgent = needs.filter((n) => n.severity !== 'watch');
+  const watch = needs.filter((n) => n.severity === 'watch');
   const open = data.jobs.filter((j) => j.status !== 'closed');
   const closed = data.jobs.filter((j) => j.status === 'closed');
   const jobName = (id?: string) => data.jobs.find((j) => j.id === id)?.name;
@@ -79,23 +82,13 @@ export function Today() {
           )}
         </section>
         <section className="stack" aria-label="Needs you">
-          <h2>Needs you ({needs.length})</h2>
-          {needs.length === 0 ? <Empty>Nothing needs you right now.</Empty> : (
-            <ul className="needs">
-              {needs.map((n, i) => {
-                const body = (
-                  <>
-                    <span className={`tag ${n.severity}`}>{n.severity === 'stop' ? 'Stop' : n.severity === 'act' ? 'Do' : 'Watch'}</span>
-                    <span>{n.label}{n.jobId && <span className="job">{jobName(n.jobId)}</span>}</span>
-                  </>
-                );
-                return (
-                  <li key={i}>
-                    {n.jobId ? <Link to={`/jobs/${n.jobId}/${n.tab}`}>{body}</Link> : <Link to="/subs">{body}</Link>}
-                  </li>
-                );
-              })}
-            </ul>
+          <h2>Needs you ({urgent.length})</h2>
+          {urgent.length === 0 ? <Empty>Nothing needs you right now.</Empty> : <NeedList items={urgent} jobName={jobName} />}
+          {watch.length > 0 && (
+            <details className="watchlist">
+              <summary>Keep an eye on ({watch.length})</summary>
+              <NeedList items={watch} jobName={jobName} />
+            </details>
           )}
         </section>
       </div>
@@ -118,17 +111,19 @@ export function Today() {
               if (from.startsWith('job:')) {
                 const src = from.slice(4);
                 const of = <T extends { job_id: string }>(rows: T[]) => rows.filter((r) => r.job_id === src);
-                const plan = copyPlan({ tasks: of(data.tasks), budget_lines: of(data.budget_lines), materials: of(data.materials), step_checks: of(data.step_checks) }, id, (job.start_date as string) || today);
+                const plan = copyPlan({ tasks: of(data.tasks), budget_lines: of(data.budget_lines), materials: of(data.materials), step_checks: of(data.step_checks), inspections: of(data.inspections) }, id, (job.start_date as string) || today);
                 if (plan.budget_lines.length) await store.insert('budget_lines', plan.budget_lines);
                 if (plan.tasks.length) await store.insert('tasks', plan.tasks);
                 if (plan.materials.length) await store.insert('materials', plan.materials as never);
                 if (plan.step_checks.length) await store.insert('step_checks', plan.step_checks);
+                if (plan.inspections.length) await store.insert('inspections', plan.inspections);
               } else if (from === 'standard' && isNewHouse(job.job_type as JobType)) {
                 await store.insert('budget_lines', starterBudget(id));
                 if (job.start_date) {
                   const steps = starterSchedule(id, job.start_date as string);
                   await store.insert('tasks', steps);
                   await store.insert('step_checks', standardChecksFor(steps) as never);
+                  await store.insert('inspections', standardInspectionsFor(id, steps) as never);
                 }
               } else if (!isNewHouse(job.job_type as JobType)) {
                 await store.insert('budget_lines', { job_id: id, code: '01', name: 'General', budget_cents: 0, bought_out: false, sort: 0 });
@@ -139,5 +134,21 @@ export function Today() {
         />
       )}
     </div>
+  );
+}
+
+function NeedList({ items, jobName }: { items: Attention[]; jobName: (id?: string) => string | undefined }) {
+  return (
+    <ul className="needs">
+      {items.map((n, i) => {
+        const body = (
+          <>
+            <span className={`tag ${n.severity}`}>{n.severity === 'stop' ? 'Stop' : n.severity === 'act' ? 'Do' : 'Watch'}</span>
+            <span>{n.label}{n.jobId && <span className="job">{jobName(n.jobId)}</span>}</span>
+          </>
+        );
+        return <li key={i}>{n.jobId ? <Link to={`/jobs/${n.jobId}/${n.tab}`}>{body}</Link> : <Link to="/subs">{body}</Link>}</li>;
+      })}
+    </ul>
   );
 }

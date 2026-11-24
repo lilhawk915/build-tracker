@@ -29,7 +29,7 @@ export function SubScorecard() {
             <thead>
               <tr>
                 <th>Sub</th><th>Grade</th><th className="right">Steps scored</th><th className="right">On time</th><th className="right">Avg days late</th>
-                <th className="right">Late now</th><th className="right">Photos sent back</th><th className="right">Bills past PO</th><th className="right">Extras</th><th />
+                <th className="right">Late now</th><th className="right">Photos sent back</th><th className="right">Failed inspections</th><th className="right">Bills past PO</th><th className="right">Extras</th><th />
               </tr>
             </thead>
             <tbody>
@@ -42,6 +42,7 @@ export function SubScorecard() {
                   <td className="right num">{c.late ? c.avgDaysLate : '–'}</td>
                   <td className="right num">{c.lateNow.length ? <span className="flag">{c.lateNow.length}</span> : 0}</td>
                   <td className="right num">{c.redos}</td>
+                  <td className="right num">{c.failedInspections}</td>
                   <td className="right num">{c.overPo}</td>
                   <td className="right num">{c.extras ? <>{c.extras}<div className="small muted">{money(c.extrasCents)}</div></> : 0}</td>
                   <td className="actions"><button className="btn tiny" onClick={() => setOpen(c)}>Details</button></td>
@@ -53,7 +54,7 @@ export function SubScorecard() {
       )}
       {!ratedAny && cards.length > 0 && <p className="small muted">Grades start once a sub has {MIN_RATED} finished steps with finish dates.</p>}
       <p className="small muted">
-        Strong: {GOOD_AT}%+ on time, nothing sent back, no bills past the PO. Problem: under {BAD_BELOW}% on time, or 2+ photos sent back. Everyone else: Watch.
+        Strong: {GOOD_AT}%+ on time, nothing sent back or failed, no bills past the PO. Problem: under {BAD_BELOW}% on time, or 2+ photos sent back or failed inspections. Everyone else: Watch.
       </p>
       {open && <ScoreDetails score={open} onClose={() => setOpen(null)} />}
     </section>

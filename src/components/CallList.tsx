@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { store, useData } from '../data';
 import { bestPhone, emailLink, firstNameOf, phoneDigits, primaryContact, smsLink, taskMessage } from '../domain/jobops';
-import { todayIso } from '../domain/rules';
+import { todayIso, niceDate } from '../domain/rules';
 import { canSeeContacts, type Task } from '../domain/types';
 import { Empty, Modal } from './ui';
 
@@ -65,7 +65,7 @@ export function CallList({ tasks, showJob, emptyText }: { tasks: Task[]; showJob
     <div className="stack">
     {!isAdmin && <p className="muted small">Contractor phone numbers and emails are private. Ask someone with access to make the call, then mark it here.</p>}
     <div className="tablewrap">
-      <table>
+      <table className="cards">
         <thead><tr><th>Starts</th>{showJob && <th>Job</th>}<th>Work</th><th>Contractor</th><th>Status</th><th /></tr></thead>
         <tbody>
           {tasks.map((t) => {
@@ -74,13 +74,13 @@ export function CallList({ tasks, showJob, emptyText }: { tasks: Task[]; showJob
             const tel = phoneDigits(bestPhone(contact));
             return (
               <tr key={t.id}>
-                <td className="num">
-                  {t.start_date}
+                <td className="num" data-label="Starts">
+                  {niceDate(t.start_date)}
                   {t.start_date < today && t.status === 'todo' && <div><span className="flag">Should have started</span></div>}
                 </td>
-                {showJob && <td><Link to={`/jobs/${t.job_id}/contractors`}>{job(t.job_id)?.name}</Link></td>}
-                <td>{t.name}</td>
-                <td>{v?.name}{bestPhone(contact) && <div className="small muted">{contact?.name && `${contact.name}, `}{bestPhone(contact)}</div>}</td>
+                {showJob && <td data-label="Job"><Link to={`/jobs/${t.job_id}/contractors`}>{job(t.job_id)?.name}</Link></td>}
+                <td className="cardtitle">{t.name}</td>
+                <td data-label="Who">{v?.name}{bestPhone(contact) && <div className="small muted">{contact?.name && `${contact.name}, `}{bestPhone(contact)}</div>}</td>
                 <td><span className={`chip ${CONTACT_CHIP[t.contact_status]}`}>{CONTACT_LABEL[t.contact_status]}</span></td>
                 <td className="actions">
                   {tel && (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
 import { FormModal, Toast, UndoButton } from './components/ui';
+import { MainNav } from './components/MainNav';
 import { DataProvider, store, useData } from './data';
 import { canSeeContacts, type Profile } from './domain/types';
 import { AutoTextsPage } from './pages/AutoTextsPage';
@@ -47,20 +48,7 @@ function Shell({ me, onSignOut }: { me: Profile; onSignOut: () => void }) {
     <>
       <header className="topbar">
         <NavLink to="/" className="brand"><i aria-hidden="true" />Build Tracker</NavLink>
-        <nav aria-label="Main">
-          {staff && <NavLink to="/" end>Today</NavLink>}
-          {me.role === 'admin' && <NavLink to="/leads">Leads</NavLink>}
-          {staff && <NavLink to="/week">Monday summary</NavLink>}
-          {staff && <NavLink to="/next">Next 2 weeks</NavLink>}
-          {staff && <NavLink to="/calls">Call list</NavLink>}
-          {staff && <NavLink to="/estimates">Estimates</NavLink>}
-          {me.role === 'admin' && <NavLink to="/invoices">Invoices</NavLink>}
-          {staff && <NavLink to="/search">All jobs</NavLink>}
-          {canSeeContacts(me) && <NavLink to="/texts">Auto texts</NavLink>}
-          {staff && <NavLink to="/subs">Subs</NavLink>}
-          {me.role === 'admin' && <NavLink to="/team">Team</NavLink>}
-          {(me.role === 'sub' || me.role === 'crew') && <NavLink to="/" end>My work</NavLink>}
-        </nav>
+        <MainNav me={me} />
         {staff && <TopSearch />}
         {staff && <UndoButton />}
         {store.mode === 'local' ? (

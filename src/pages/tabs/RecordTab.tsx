@@ -1,3 +1,4 @@
+import { niceDate } from '../../domain/rules';
 import { useState } from 'react';
 import { Empty, FormModal, money, Status } from '../../components/ui';
 import { store, useData } from '../../data';
@@ -128,7 +129,7 @@ export function RecordTab({ job }: { job: Job }) {
               <thead><tr><th>Item</th><th>Qty</th><th>Supplier</th><th>Order no.</th><th>Status</th><th>Arrived</th><th className="right">Cost</th></tr></thead>
               <tbody>
                 {materials.map((m) => (
-                  <tr key={m.id}><td><b>{m.name}</b></td><td>{m.quantity}</td><td>{m.supplier}</td><td className="num small">{m.order_number}</td><td>{m.status === 'ordered' ? 'On order' : m.status === 'arrived' ? 'Arrived' : 'Needed'}</td><td className="num small">{m.arrived_date}</td><td className="right num">{m.cost_cents != null ? money(m.cost_cents) : ''}</td></tr>
+                  <tr key={m.id}><td><b>{m.name}</b></td><td>{m.quantity}</td><td>{m.supplier}</td><td className="num small">{m.order_number}</td><td>{m.status === 'ordered' ? 'On order' : m.status === 'arrived' ? 'Arrived' : 'Needed'}</td><td className="num small">{niceDate(m.arrived_date)}</td><td className="right num">{m.cost_cents != null ? money(m.cost_cents) : ''}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -163,7 +164,7 @@ export function RecordTab({ job }: { job: Job }) {
           <div className="stack">
             {logs.map((l) => (
               <div className="panel" key={l.id}>
-                <b className="num">{l.log_date}</b> <span className="muted small">{[l.weather, l.author].filter(Boolean).join(' · ')}</span>
+                <b className="num">{niceDate(l.log_date)}</b> <span className="muted small">{[l.weather, l.author].filter(Boolean).join(' · ')}</span>
                 <p style={{ whiteSpace: 'pre-wrap' }}>{l.notes}</p>
               </div>
             ))}

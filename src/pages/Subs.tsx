@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Empty, FormModal, Modal, money } from '../components/ui';
 import { store, useData } from '../data';
 import { bestPhone, primaryContact } from '../domain/jobops';
-import { coiFlag, todayIso } from '../domain/rules';
+import { coiFlag, todayIso, niceDate } from '../domain/rules';
 import { canSeeContacts, type Vendor, type VendorContact } from '../domain/types';
 import { SubScorecard } from './SubScorecard';
 
@@ -138,7 +138,7 @@ export function Subs() {
                       {f?.severity === 'stop' ? <span className="flag">Expired</span>
                         : f ? <span className="chip warn">{v.coi_expires ? 'Expires soon' : 'None on file'}</span>
                         : <span className="chip good">Current</span>}
-                      {v.coi_expires && <div className="num small muted">{v.coi_expires}</div>}
+                      {v.coi_expires && <div className="num small muted">{niceDate(v.coi_expires)}</div>}
                     </td>
                     <td>{v.w9_on_file ? <span className="chip good">On file</span> : <span className="chip warn">Missing</span>}</td>
                     <td className="right num">{money(paidYear(v.id))}</td>

@@ -4,7 +4,8 @@ import { Empty, FormModal, Modal, money, Status } from '../../components/ui';
 import { store, useData } from '../../data';
 import { drawSheet, rollupJob, rollupLines } from '../../domain/budget';
 import { centsToDecimal, parseMoney } from '../../domain/csv';
-import { todayIso } from '../../domain/rules';
+import { todayIso, niceDate } from '../../domain/rules';
+import { drawFromProgress, drawStanding } from '../../domain/draws';
 import type { Draw, Job } from '../../domain/types';
 
 export function DrawsTab({ job }: { job: Job }) {
@@ -17,17 +18,32 @@ export function DrawsTab({ job }: { job: Job }) {
   const drawLines = data.draw_lines.filter((l) => ids.has(l.draw_id));
   const r = rollupJob(job, of(data.budget_lines), of(data.pos), of(data.bills), of(data.change_orders), draws, drawLines);
   const total = (id: string) => drawLines.filter((l) => l.draw_id === id).reduce((s, l) => s + l.amount_cents, 0);
+  const rolls = rollupLines(of(data.budget_lines), of(data.pos), of(data.bills), of(data.change_orders));
+  const standing = drawStanding(rolls, draws, drawLines);
+  const openDraft = draws.find((d) => d.status === 'draft');
+
+  // A new draft draw, filled from each line's % done when any line has one.
+  async function startDraw(fromProgress: boolean) {
+    const id = crypto.randomUUID();
+    return run(async () => {
+      await store.insert('draws', { id, job_id: job.id, status: 'draft', funded_cents: 0, notes: '' } as never);
+      if (fromProgress) {
+        const rows = drawFromProgress(rolls, draws, drawLines).filter((r) => r.amount > 0).map((r) => ({ draw_id: id, budget_line_id: r.lineId, amount_cents: r.amount }));
+        if (rows.length) await store.insert('draw_lines', rows);
+      }
+    }, fromProgress ? 'Draft draw filled in from % done. Check the amounts, then mark it requested.' : 'Draft draw added. Enter its amounts.');
+  }
 
   return (
     <div className="stack">
       <div className="row between">
         <h2>Lender draws</h2>
-        <button
-          className="btn primary"
-          onClick={async () => { await run(() => store.insert('draws', { job_id: job.id, status: 'draft', funded_cents: 0, notes: '' }), 'Draft draw added. Enter its amounts.'); }}
-        >
-          Start a draw
-        </button>
+        {!openDraft && (
+          <div className="row">
+            {standing.ready > 0 && <button className="btn primary" onClick={() => startDraw(true)}>Start a draw for {money(standing.ready)} of finished work</button>}
+            <button className={`btn ${standing.ready > 0 ? '' : 'primary'}`} onClick={() => startDraw(false)}>{standing.ready > 0 ? 'Start a blank draw' : 'Start a draw'}</button>
+          </div>
+        )}
       </div>
       <div className="panel">
         <dl className="figs strip">
@@ -36,8 +52,12 @@ export function DrawsTab({ job }: { job: Job }) {
           <div><dt>Funded so far</dt><dd>{money(r.drawnFunded)}</dd></div>
           <div><dt>Left to draw</dt><dd>{money(r.loanLeft)}</dd></div>
           <div><dt>Paid out of pocket</dt><dd>{money(r.outOfPocket)}</dd></div>
+          {standing.tracked && <div><dt>Finished work not drawn</dt><dd>{money(standing.ready)}</dd></div>}
         </dl>
+        {!standing.tracked && <p className="small muted" style={{ marginBottom: 0 }}>Set % done on the budget lines and the app works out how much you can draw.</p>}
       </div>
+      {standing.ahead > 0 && <div className="alert">Draws are {money(standing.ahead)} ahead of the work done. Lenders check this at their inspection. Hold off or update % done on the Budget tab.</div>}
+      {openDraft && <div className="alert calm">Draw {openDraft.number} is a draft. Check its amounts, then mark it requested.</div>}
       {draws.length === 0 ? <Empty>Start a draw to build the sheet your lender needs.</Empty> : (
         <div className="tablewrap">
           <table>
@@ -46,9 +66,9 @@ export function DrawsTab({ job }: { job: Job }) {
               {draws.map((d) => (
                 <tr key={d.id}>
                   <td className="num">{d.number}</td>
-                  <td className="num">{d.requested_date}</td>
+                  <td className="num">{niceDate(d.requested_date)}</td>
                   <td className="right num">{money(total(d.id))}</td>
-                  <td className="num">{d.funded_date}</td>
+                  <td className="num">{niceDate(d.funded_date)}</td>
                   <td className="right num">{d.status === 'funded' ? money(d.funded_cents) : ''}</td>
                   <td>{d.notes}</td>
                   <td><Status s={d.status} /></td>
@@ -102,6 +122,9 @@ function DrawEditor({ job, draw, onClose }: { job: Job; draw: Draw; onClose: () 
   const [err, setErr] = useState('');
   const cents = (id: string) => parseMoney(vals[id] ?? '');
   const sum = sheet.reduce((s, x) => s + (cents(x.line.id) ?? 0), 0);
+  const progress = drawFromProgress(rolls, draws, drawLines, draw.id);
+  const done = (id: string) => progress.find((p) => p.lineId === id);
+  const fill = () => setVals(Object.fromEntries(sheet.map((s) => { const p = done(s.line.id); return [s.line.id, p?.amount ? centsToDecimal(p.amount) : '']; })));
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -121,15 +144,19 @@ function DrawEditor({ job, draw, onClose }: { job: Job; draw: Draw; onClose: () 
       <form className="stack" onSubmit={save}>
         <div className="tablewrap" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
           <table>
-            <thead><tr><th>Line</th><th className="right">Budget</th><th className="right">Drawn before</th><th className="right">Billed</th><th className="right" style={{ width: 130 }}>This draw</th></tr></thead>
+            <thead><tr><th>Line</th><th className="right">Budget</th><th className="right">% done</th><th className="right">Work done</th><th className="right">Drawn before</th><th className="right">Billed</th><th className="right" style={{ width: 130 }}>This draw</th></tr></thead>
             <tbody>
               {sheet.map((s) => {
                 const c = cents(s.line.id) ?? 0;
                 const over = s.prior + c > s.budget;
+                const p = done(s.line.id);
+                const ahead = p && s.prior + c > p.earned;
                 return (
                   <tr key={s.line.id}>
-                    <td>{s.line.name}{over && <div><span className="flag">Over budget</span></div>}</td>
+                    <td>{s.line.name}{over && <div><span className="flag">Over budget</span></div>}{!over && ahead && <div><span className="chip warn">More than the work done</span></div>}</td>
                     <td className="right num">{money(s.budget)}</td>
+                    <td className="right num">{p ? `${p.pct}%` : ''}</td>
+                    <td className="right num">{p ? money(p.earned) : ''}</td>
                     <td className="right num">{money(s.prior)}</td>
                     <td className="right num">{money(rolls.find((r) => r.line.id === s.line.id)?.billed ?? 0)}</td>
                     <td>
@@ -141,7 +168,11 @@ function DrawEditor({ job, draw, onClose }: { job: Job; draw: Draw; onClose: () 
             </tbody>
           </table>
         </div>
-        <p><b>This draw: <span className="num">{money(sum)}</span></b></p>
+        <div className="row between">
+          <p style={{ margin: 0 }}><b>This draw: <span className="num">{money(sum)}</span></b></p>
+          {progress.length > 0 && <button type="button" className="btn" onClick={fill}>Fill from % done</button>}
+        </div>
+        {progress.length === 0 && <p className="small muted">Tip: set % done on the Budget tab and this sheet can fill itself in.</p>}
         <label className="field">Notes for the lender<textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
         {err && <div className="alert" role="alert">{err}</div>}
         <div className="row">

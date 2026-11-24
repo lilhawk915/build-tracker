@@ -50,7 +50,7 @@ describe('walk-through checklists', () => {
     const job = { id: 'j', name: 'Lot 1', address: '', job_type: 'spec', status: 'active', sale_price_cents: 0, loan_amount_cents: 0, lender: '', start_date: null, target_finish: null, notes: '' } as Job;
     const tasks = [task('a', 'Drywall', '2027-01-14')];
     const soon = attention({ ...base, jobs: [job], tasks, step_checks: [check('a', false)] }, '2027-01-12', String);
-    expect(soon[0]).toMatchObject({ severity: 'act', label: 'Walk the checklist before Drywall starts 2027-01-14: 0 of 1 done' });
+    expect(soon[0]).toMatchObject({ severity: 'act', label: 'Walk the checklist before Drywall starts Jan 14: 0 of 1 done' });
     const late = attention({ ...base, jobs: [job], tasks, step_checks: [check('a', false)] }, '2027-01-15', String);
     expect(late.find((a) => a.label.startsWith('Walk'))?.severity).toBe('stop');
   });

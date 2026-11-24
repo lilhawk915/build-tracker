@@ -4,7 +4,7 @@ import { store, useData } from '../data';
 import { safeFileName } from '../data/store';
 import { poTotal } from '../domain/budget';
 import { Thumb } from './tabs/LogTab';
-import { coiFlag, todayIso } from '../domain/rules';
+import { coiFlag, todayIso, niceDate } from '../domain/rules';
 import type { Po, TaskStatus, Waiver } from '../domain/types';
 
 export function Portal() {
@@ -60,7 +60,7 @@ export function Portal() {
           <div>
             <b>{jobName(w.job_id)}</b>
             <div>{WAIVER_LABEL[w.kind]} waiver, <span className="num">{money(w.amount_cents)}</span></div>
-            {w.through_date && <div className="muted small">Through {w.through_date}</div>}
+            {w.through_date && <div className="muted small">Through {niceDate(w.through_date)}</div>}
           </div>
           <button className="btn primary" onClick={() => setSigning(w)}>Upload signed waiver</button>
         </div>
@@ -89,7 +89,7 @@ export function Portal() {
             <div className="muted small">{jobName(m.job_id)}</div>
           </div>
           <span className={`chip ${m.status === 'arrived' ? 'good' : 'warn'}`}>
-            {m.status === 'needed' ? 'Asked for' : m.status === 'ordered' ? `On order${m.expected_date ? `, arriving ${m.expected_date}` : ''}` : 'Arrived'}
+            {m.status === 'needed' ? 'Asked for' : m.status === 'ordered' ? `On order${m.expected_date ? `, arriving ${niceDate(m.expected_date)}` : ''}` : 'Arrived'}
           </span>
         </div>
       ))}
@@ -100,7 +100,7 @@ export function Portal() {
           <div>
             <b>{t.name}</b>
             <div className="muted small">{jobName(t.job_id)}</div>
-            <div className="num small">{t.start_date} to {t.end_date}</div>
+            <div className="num small">{niceDate(t.start_date)} to {niceDate(t.end_date)}</div>
             {t.notes && <div className="small">{t.notes}</div>}
             <div style={{ marginTop: 8 }}>
               {t.contact_status === 'confirmed'
@@ -144,11 +144,11 @@ export function Portal() {
             <tbody>
               {bills.map((b) => (
                 <tr key={b.id}>
-                  <td className="num">{b.bill_date}</td>
+                  <td className="num">{niceDate(b.bill_date)}</td>
                   <td>{jobName(b.job_id)}</td>
                   <td>{b.invoice_no}</td>
                   <td className="right num">{money(b.amount_cents)}</td>
-                  <td><Status s={b.status} />{b.status === 'rejected' && b.notes && <div className="small muted">{b.notes}</div>}{b.status === 'paid' && <div className="small muted">{b.paid_date}</div>}</td>
+                  <td><Status s={b.status} />{b.status === 'rejected' && b.notes && <div className="small muted">{b.notes}</div>}{b.status === 'paid' && <div className="small muted">{niceDate(b.paid_date)}</div>}</td>
                   <td className="actions">{b.file_path && <FileLink path={b.file_path} />}</td>
                 </tr>
               ))}

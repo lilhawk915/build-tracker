@@ -1,3 +1,4 @@
+import { niceDate } from '../domain/rules';
 import { useState } from 'react';
 import { NavLink, useNavigate, useParams } from 'react-router-dom';
 import { FormModal, HealthChip, money, Status } from '../components/ui';
@@ -21,12 +22,13 @@ import { ScheduleTab } from './tabs/ScheduleTab';
 import { WaiversTab } from './tabs/WaiversTab';
 import { jobFields } from './jobFields';
 
-const TABS = [
-  ['record', 'Job record'], ['scope', 'What it needs'], ['schedule', 'Schedule'], ['contractors', 'Contractors'],
-  ['materials', 'Materials'], ['budget', 'Budget'], ['pos', 'POs'], ['bills', 'Bills'], ['waivers', 'Lien waivers'],
-  ['changes', 'Change orders'], ['draws', 'Draws'], ['selections', 'Colors and selections'], ['files', 'Drawings and files'],
-  ['log', 'Site log'],
-] as const;
+// Pages on a job, in four groups so there are never more than a handful of tabs on screen.
+const GROUPS: { key: string; label: string; tabs: [string, string][] }[] = [
+  { key: 'overview', label: 'Overview', tabs: [['record', 'Job record'], ['scope', 'What it needs'], ['log', 'Site log']] },
+  { key: 'work', label: 'Schedule', tabs: [['schedule', 'Schedule'], ['contractors', 'Contractors'], ['materials', 'Materials']] },
+  { key: 'money', label: 'Money', tabs: [['budget', 'Budget'], ['bills', 'Bills'], ['pos', 'POs'], ['changes', 'Change orders'], ['draws', 'Draws'], ['waivers', 'Lien waivers']] },
+  { key: 'files', label: 'Files', tabs: [['files', 'Drawings and files'], ['selections', 'Colors and selections']] },
+];
 
 export function JobPage() {
   const { jobId, tab: tabParam } = useParams();
@@ -37,6 +39,8 @@ export function JobPage() {
   if (!job) return <div className="alert" role="alert">This job no longer exists or you don't have access to it.</div>;
 
   const tab = tabParam ?? (job.status === 'closed' ? 'record' : 'budget');
+  const groups = GROUPS.map((g) => (g.key === 'money' && me.role === 'admin' ? { ...g, tabs: [...g.tabs, ['invoices', 'Invoices'] as [string, string]] } : g));
+  const group = groups.find((g) => g.tabs.some(([k]) => k === tab)) ?? groups[0];
 
   return (
     <div>
@@ -45,7 +49,7 @@ export function JobPage() {
           <h1>{job.name}</h1>
           <p className="muted">
             {job.address || 'No address yet'} · {jobTypeLabel(job)}
-            {job.target_finish && ` · Target finish ${job.target_finish}`}
+            {job.target_finish && ` · Target finish ${niceDate(job.target_finish)}`}
             {job.lender && ` · ${job.lender}${job.loan_amount_cents ? ` ${money(job.loan_amount_cents)}` : ''}`}
             {job.status !== 'closed' && dailyCarryCents(job) > 0 && ` · About ${money(dailyCarryCents(job))} a day to carry`}
           </p>
@@ -56,11 +60,18 @@ export function JobPage() {
           <button className="btn" onClick={() => setEditing(true)}>Edit job</button>
         </div>
       </div>
-      <nav className="tabs" aria-label="Job sections">
-        {[...TABS, ...(me.role === 'admin' ? [['invoices', 'Invoices'] as const] : [])].map(([k, label]) => (
-          <NavLink key={k} to={`/jobs/${job.id}/${k}`} className={tab === k ? 'active' : ''}>{label}</NavLink>
+      <nav className="tabgroups" aria-label="Job areas">
+        {groups.map((g) => (
+          <NavLink key={g.key} to={`/jobs/${job.id}/${g.tabs[0][0]}`} className={g === group ? 'active' : ''}>{g.label}</NavLink>
         ))}
       </nav>
+      {group.tabs.length > 1 && (
+        <nav className="tabs" aria-label="Job sections">
+          {group.tabs.map(([k, label]) => (
+            <NavLink key={k} to={`/jobs/${job.id}/${k}`} className={tab === k ? 'active' : ''}>{label}</NavLink>
+          ))}
+        </nav>
+      )}
       {tab === 'scope' && <ScopeTab job={job} />}
       {tab === 'materials' && <MaterialsTab job={job} />}
       {tab === 'contractors' && <ContractorsTab job={job} />}

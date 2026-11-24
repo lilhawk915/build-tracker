@@ -70,17 +70,17 @@ export function LookAheadPage() {
         <section key={g.key} className="stack" aria-label={g.label}>
           <h2>{g.label}</h2>
           <div className="tablewrap">
-            <table>
+            <table className="cards">
               <thead><tr><th>Dates</th><th>Job</th><th>Work</th><th>Who</th><th>Status</th></tr></thead>
               <tbody>
                 {g.tasks.map((t) => {
                   const key = whoKey(t);
                   return (
                     <tr key={t.id}>
-                      <td className="num">{t.start_date === t.end_date ? shortDate(t.start_date) : `${shortDate(t.start_date)} to ${shortDate(t.end_date)}`}</td>
-                      <td><Link to={`/jobs/${t.job_id}/schedule`}>{job(t.job_id)?.name}</Link></td>
-                      <td>{t.name}{t.notes && <div className="small muted">{t.notes}</div>}</td>
-                      <td>{key === 'none' ? <span className="flag">No one set</span> : nameOf(key)}</td>
+                      <td className="num" data-label="When">{t.start_date === t.end_date ? shortDate(t.start_date) : `${shortDate(t.start_date)} to ${shortDate(t.end_date)}`}</td>
+                      <td data-label="Job"><Link to={`/jobs/${t.job_id}/schedule`}>{job(t.job_id)?.name}</Link></td>
+                      <td className="cardtitle">{t.name}{t.notes && <div className="small muted">{t.notes}</div>}</td>
+                      <td data-label="Who">{key === 'none' ? <span className="flag">No one set</span> : nameOf(key)}</td>
                       <td>
                         {t.status === 'in_progress' && <span className="chip good">Started</span>}
                         {t.status === 'todo' && t.vendor_id && <span className={`chip ${CHIP[t.contact_status]}`}>{CONTACT_LABEL[t.contact_status]}</span>}

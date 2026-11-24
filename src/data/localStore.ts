@@ -4,7 +4,7 @@ import type { Bill, ChangeOrder, Photo, Profile, TableName, Tables, Waiver } fro
 import { seed, type DB } from './seed';
 import { rowKey, type Store } from './store';
 
-const KEY = 'build-tracker-demo-v10';
+const KEY = 'build-tracker-demo-v11';
 const WHO = 'build-tracker-demo-who';
 const NUMBERED = new Set<TableName>(['pos', 'change_orders', 'draws']);
 const files = new Map<string, string>();
@@ -195,6 +195,10 @@ export const localStore: Store = {
         db.estimate_markups.push({ estimate_id: row.id as string, sales_tax_pct: d.sales_tax_pct, contingency_pct: d.contingency_pct, overhead_pct: d.overhead_pct, profit_pct: d.profit_pct, profit_amount: null });
       }
       if (table === 'tasks') { row.contact_status ??= 'not_contacted'; trackFinish(row, null); }
+      if (table === 'inspections') {
+        row.result ??= 'not_scheduled'; row.task_id ??= null; row.vendor_id ??= null; row.scheduled_date ??= null; row.result_date ??= null;
+        row.inspector ??= ''; row.notes ??= ''; row.fail_count ??= 0; row.sort ??= 0;
+      }
       if (table === 'step_checks') { row.done ??= false; row.done_at ??= null; row.done_by ??= ''; row.sort ??= 0; }
       if (table === 'budget_lines') { row.code ??= ''; row.bought_out ??= false; row.budget_cents ??= 0; row.sort ??= 0; }
       if (table === 'photos') {
@@ -255,9 +259,10 @@ export const localStore: Store = {
     if (table === 'tasks') {
       for (const m of db.materials) if (m.task_id === id) m.task_id = null;
       db.step_checks = (db.step_checks ?? []).filter((c) => c.task_id !== id);
+      for (const i of db.inspections ?? []) if (i.task_id === id) i.task_id = null;
     }
     if (table === 'jobs') {
-      for (const t of ['budget_lines', 'pos', 'bills', 'change_orders', 'draws', 'lien_waivers', 'tasks', 'daily_logs', 'photos', 'selections', 'documents', 'job_steps', 'step_checks', 'scope_items', 'materials', 'notifications'] as const) {
+      for (const t of ['budget_lines', 'pos', 'bills', 'change_orders', 'draws', 'lien_waivers', 'tasks', 'daily_logs', 'photos', 'selections', 'documents', 'job_steps', 'step_checks', 'inspections', 'scope_items', 'materials', 'notifications'] as const) {
         (db[t] as unknown as { job_id: string }[]) = (db[t] as unknown as { job_id: string }[]).filter((r) => r.job_id !== id);
       }
     }

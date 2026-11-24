@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Empty, FormModal } from '../../components/ui';
 import { store, useData } from '../../data';
 import { safeFileName } from '../../data/store';
-import { todayIso } from '../../domain/rules';
+import { todayIso, niceDate } from '../../domain/rules';
 import type { Job, Photo } from '../../domain/types';
 
 export function Thumb({ photo }: { photo: Photo }) {
@@ -83,7 +83,7 @@ export function LogTab({ job }: { job: Job }) {
           {logs.map((l) => (
             <div className="panel" key={l.id}>
               <div className="row between">
-                <b className="num">{l.log_date}</b>
+                <b className="num">{niceDate(l.log_date)}</b>
                 <span className="muted small">{[l.weather, l.author].filter(Boolean).join(' · ')}</span>
               </div>
               <p style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{l.notes}</p>

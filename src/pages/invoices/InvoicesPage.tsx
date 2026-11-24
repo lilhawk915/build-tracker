@@ -1,3 +1,4 @@
+import { niceDate } from '../../domain/rules';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { Empty } from '../../components/ui';
@@ -25,7 +26,7 @@ export function InvoiceTable({ rows, showJob = true }: { rows: Invoice[]; showJo
               <td className="num"><Link to={`/invoices/${i.id}`}>{i.number}</Link></td>
               <td><Link to={`/invoices/${i.id}`}>{i.bill_to || i.address || 'No name yet'}</Link>{KIND_WORD[i.kind ?? 'standard'] && <> <span className="chip">{KIND_WORD[i.kind ?? 'standard']}</span></>}</td>
               {showJob && <td>{i.job_id && jobName(i.job_id) ? <Link to={`/jobs/${i.job_id}/invoices`}>{jobName(i.job_id)}</Link> : <span className="muted">No job</span>}</td>}
-              <td className="num">{i.invoice_date}</td>
+              <td className="num">{niceDate(i.invoice_date)}</td>
               <td className="right num">{money(invoiceTotal(i))}</td>
               <td className="right num">{money(Number(i.paid_cents))}</td>
               <td className="right num">{money(invoiceBalance(i))}</td>
