@@ -526,6 +526,9 @@ check('crew sees their request', (await text()).includes('Quarter round'));
 await shot('26-crew');
 await page.getByLabel('Status of Dry-in and roof').selectOption('in_progress');
 await page.getByText('Status updated').waitFor();
+await page.getByLabel('Status of Paint').selectOption('in_progress');
+await page.getByText('Finish the walk-through checklist for Paint first: 0 of 1 done.').waitFor();
+check('crew cannot start a step with an open checklist', (await page.getByLabel('Status of Paint').inputValue()) === 'todo');
 await page.locator('.row', { hasText: 'Windows' }).getByRole('button', { name: 'It arrived' }).click();
 await page.getByText('Windows marked arrived').waitFor();
 for (const path of ['/jobs/oak/budget', '/search?q=alabaster', '/subs', '/calls']) {

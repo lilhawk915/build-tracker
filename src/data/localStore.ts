@@ -1,6 +1,8 @@
 // Demo mode. Mirrors the database rules closely enough to try the whole app; real enforcement is in the migration.
 import { canMoveBill, followUpWaiverKind, payBlockers, todayIso } from '../domain/rules';
-import type { Bill, ChangeOrder, Photo, Profile, TableName, Tables, Waiver } from '../domain/types';
+import { startBlocker } from '../domain/checks';
+import { inspectionBlocker } from '../domain/inspections';
+import type { Bill, ChangeOrder, Photo, Profile, TableName, Tables, Task, Waiver } from '../domain/types';
 import { seed, type DB } from './seed';
 import { rowKey, type Store } from './store';
 
@@ -33,6 +35,14 @@ function load(): DB {
 const save = () => storage(KEY, JSON.stringify(memory));
 const who = () => storage(WHO) ?? 'demo-admin';
 const me = (): Profile => load().profiles.find((p) => p.id === who()) ?? load().profiles[0];
+
+/** Same rule as the database's task_start_gate: no starting a step with an open checklist or an inspection not passed. */
+function startGate(db: DB, before: Record<string, unknown>, status: unknown) {
+  if (before.status !== 'todo' || status === 'todo' || status === undefined) return;
+  const task = before as unknown as Task;
+  const block = startBlocker(task, db.step_checks ?? []) ?? inspectionBlocker(task, db.inspections ?? []);
+  if (block) throw new Error(block);
+}
 
 /** Same rule as the database's task_track_finish: when a step finished, and the end date it was held to. */
 function trackFinish(row: Record<string, unknown>, before: Record<string, unknown> | null) {
@@ -235,6 +245,7 @@ export const localStore: Store = {
     } else if (table === 'tasks') {
       // Same rule as the database: new dates or a new sub means they need to hear about it again.
       const before = { ...row };
+      startGate(db, before, (patch as Record<string, unknown>).status);
       Object.assign(row, patch);
       if (['start_date', 'end_date', 'vendor_id'].some((k) => row[k] !== before[k])) row.contact_status = 'not_contacted';
       trackFinish(row, before);
@@ -306,6 +317,7 @@ export const localStore: Store = {
     const t = db.tasks.find((x) => x.id === id && (p.role === 'crew' ? x.assigned_to === p.id : x.vendor_id === p.vendor_id));
     if (!t) throw new Error('This task is not assigned to you.');
     const before = { ...t };
+    startGate(db, before as unknown as Record<string, unknown>, status);
     t.status = status as typeof t.status;
     trackFinish(t as unknown as Record<string, unknown>, before as unknown as Record<string, unknown>);
     save();
