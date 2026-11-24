@@ -6,7 +6,7 @@ export const jobFields: FieldDef[] = [
   { key: 'address', label: 'Address' },
   { key: 'job_type', label: 'Type', type: 'select', options: JOB_TYPES },
   { key: 'type_note', label: 'What kind of job', help: 'Optional. Deck, roof replacement, storm damage…' },
-  { key: 'status', label: 'Status', type: 'select', options: [{ value: 'planning', label: 'Planning' }, { value: 'active', label: 'Active' }, { value: 'closed', label: 'Closed' }] },
+  { key: 'status', label: 'Status', type: 'select', options: [{ value: 'planning', label: 'Planning' }, { value: 'active', label: 'Active' }, { value: 'closed', label: 'Done' }] },
   { key: 'sale_price_cents', label: 'Contract or expected sale price', help: 'Leave the fields below blank if they do not apply to this job.', type: 'money' },
   { key: 'loan_amount_cents', label: 'Construction loan amount', type: 'money' },
   { key: 'lender', label: 'Lender' },

@@ -1,6 +1,6 @@
 import { niceDate } from '../../domain/rules';
 import { useState } from 'react';
-import { Empty, FormModal, money, Status } from '../../components/ui';
+import { Empty, FormModal, money, Status, JobStatus } from '../../components/ui';
 import { store, useData } from '../../data';
 import { rollupJob } from '../../domain/budget';
 import { bestPhone, primaryContact } from '../../domain/jobops';
@@ -59,7 +59,7 @@ export function RecordTab({ job }: { job: Job }) {
       <section className="panel">
         <div className="row between" style={{ marginBottom: 12 }}>
           <h2 style={{ margin: 0 }}>{job.name}</h2>
-          <Status s={job.status} />
+          <JobStatus s={job.status} />
         </div>
         <dl className="factgrid">
           {facts.filter(([, v]) => v !== null && v !== undefined && v !== '').map(([k, v]) => (

@@ -2,7 +2,7 @@ import { standardChecksFor } from '../domain/checks';
 import { standardInspectionsFor } from '../domain/inspections';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Empty, FormModal, HealthChip, money, Status, Tape, TapeLegend } from '../components/ui';
+import { Empty, FormModal, HealthChip, money, Tape, TapeLegend, JobStatus } from '../components/ui';
 import { store, useData } from '../data';
 import { attention, type Attention } from '../domain/attention';
 import { rollupJob } from '../domain/budget';
@@ -51,7 +51,7 @@ export function Today() {
           </div>
           <div className="row">
             {job.status !== 'closed' && <HealthChip job={job} />}
-            <Status s={job.status} />
+            <JobStatus s={job.status} />
           </div>
         </div>
         <Tape budget={r.revised} paid={r.paid} billed={r.billed} committed={r.committed} />
@@ -76,7 +76,7 @@ export function Today() {
           {open.length > 0 && <TapeLegend />}
           {closed.length > 0 && (
             <details>
-              <summary>Closed jobs ({closed.length})</summary>
+              <summary>Done jobs ({closed.length})</summary>
               <div className="stack" style={{ marginTop: 10 }}>{closed.map(card)}</div>
             </details>
           )}

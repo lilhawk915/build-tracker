@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Empty, FileLink, Status } from '../components/ui';
+import { Empty, FileLink, JobStatus } from '../components/ui';
 import { useData } from '../data';
 import { highlightParts, jobYear, KIND_LABEL, search, type JobHit, type SearchKind } from '../domain/search';
 import { JOB_TYPES, jobTypeLabel } from '../domain/types';
@@ -41,7 +41,7 @@ function Hit({ hit, query, cash }: { hit: JobHit; query: string; cash?: JobMoney
             </div>
           </dl>
         )}
-        <Status s={job.status} />
+        <JobStatus s={job.status} />
       </header>
       {shown.map((r) => (
         <div className="hitrow" key={r.key}>

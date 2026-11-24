@@ -400,3 +400,4 @@ tr.notincluded td:first-child { opacity: 1; }
 .watchlist summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
 .watchlist .needs { margin-top: 6px; }
 @media (max-width: 860px) { .today > section[aria-label="Needs you"] { order: -1; } }
+.chip.done { background: var(--ink); color: #fff; border-color: var(--ink); }

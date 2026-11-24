@@ -1,7 +1,7 @@
 import { niceDate } from '../domain/rules';
 import { useState } from 'react';
 import { NavLink, useNavigate, useParams } from 'react-router-dom';
-import { FormModal, HealthChip, money, Status } from '../components/ui';
+import { FormModal, HealthChip, money, JobStatus } from '../components/ui';
 import { store, useData } from '../data';
 import { dailyCarryCents } from '../domain/jobops';
 import { jobTypeLabel } from '../domain/types';
@@ -56,7 +56,7 @@ export function JobPage() {
         </div>
         <div className="row">
           {job.status !== 'closed' && <HealthChip job={job} />}
-          <Status s={job.status} />
+          <JobStatus s={job.status} />
           <button className="btn" onClick={() => setEditing(true)}>Edit job</button>
         </div>
       </div>

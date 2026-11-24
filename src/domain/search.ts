@@ -143,7 +143,7 @@ export function search(d: SearchData, query: string, opts: SearchOptions = {}): 
       hits.push({ job, jobMatched, records: found });
     }
   }
-  return hits.sort((a, b) => Number(b.jobMatched) - Number(a.jobMatched) || jobYear(b.job).localeCompare(jobYear(a.job)) || a.job.name.localeCompare(b.job.name));
+  return hits.sort((a, b) => Number(b.jobMatched) - Number(a.jobMatched) || Number(a.job.status === 'closed') - Number(b.job.status === 'closed') || jobYear(b.job).localeCompare(jobYear(a.job)) || a.job.name.localeCompare(b.job.name));
 }
 
 // Pieces of text for highlighting: words from the query are marked, ignoring case.

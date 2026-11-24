@@ -53,6 +53,12 @@ export const Status = ({ s }: { s: string }) => (
   <span className={`chip ${CHIP[s] ?? ''}`}>{WORD[s] ?? s[0].toUpperCase() + s.slice(1)}</span>
 );
 
+const JOB_WORD: Record<string, string> = { planning: 'Planning', active: 'Active', closed: 'Done' };
+/** A job's status in plain words: a finished (closed) job reads "Done". */
+export const JobStatus = ({ s }: { s: string }) => (
+  <span className={`chip ${s === 'closed' ? 'done' : CHIP[s] ?? ''}`}>{JOB_WORD[s] ?? s}</span>
+);
+
 export const WAIVER_LABEL: Record<string, string> = {
   conditional_progress: 'Conditional progress',
   unconditional_progress: 'Unconditional progress',
