@@ -26,6 +26,7 @@ const tab = async (name) => {
 await page.goto(BASE);
 await page.getByRole('heading', { name: 'Today' }).waitFor();
 let t = await text();
+check('partner deal shows our share of the profit', /Your 50%: -?\$[\d,]+/.test(await page.locator('.jobcard', { hasText: 'Cedar Lot 4' }).innerText()));
 check('today lists all three builds', ['Oak Ridge spec', 'Maple Ct custom', 'Cedar Lot 4'].every((x) => t.includes(x)));
 check('flags framing over budget', t.includes('Framing is $5,500 over budget'));
 check('flags expired insurance', /Sample Electric: insurance expired/.test(t));
@@ -159,7 +160,7 @@ await modal().getByRole('button', { name: 'Add job' }).click();
 await page.getByRole('heading', { name: 'Budget lines' }).waitFor();
 const copyId = new URL(page.url()).pathname.split('/')[2];
 const counts = await page.evaluate(([id]) => {
-  const db = JSON.parse(localStorage.getItem('build-tracker-demo-v11') ?? '{}');
+  const db = JSON.parse(localStorage.getItem('build-tracker-demo-v12') ?? '{}');
   const of = (t) => (db[t] ?? []).filter((r) => r.job_id === id);
   const src = (t) => (db[t] ?? []).filter((r) => r.job_id === 'oak');
   const sum = (rows) => rows.reduce((a, r) => a + r.budget_cents, 0);
@@ -431,7 +432,7 @@ await modal().getByLabel('Status').selectOption('in_progress');
 await modal().getByRole('button', { name: 'Save task' }).click();
 await page.getByText('Task saved').waitFor();
 check('finished checklist lets the step start', (await row('Rough inspections and insulation').first().innerText()).includes('Checklist 6/6'));
-const tracked = () => page.evaluate(() => JSON.parse(localStorage.getItem('build-tracker-demo-v11')).tasks.find((t) => t.job_id === 'oak' && t.name === 'Rough inspections and insulation'));
+const tracked = () => page.evaluate(() => JSON.parse(localStorage.getItem('build-tracker-demo-v12')).tasks.find((t) => t.job_id === 'oak' && t.name === 'Rough inspections and insulation'));
 let ins = await tracked();
 check('starting a step records the finish it is held to', ins.promised_end === ins.end_date && !ins.completed_at);
 await row('Rough inspections and insulation').first().getByRole('button', { name: 'Edit' }).click();

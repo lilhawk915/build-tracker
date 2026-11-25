@@ -71,6 +71,8 @@ export interface Job {
   interest_rate?: number | null;
   /** Other carrying costs per month: taxes, insurance, utilities. */
   holding_monthly_cents?: number | null;
+  /** Partner deals: the percent of the profit that's ours. Null means all of it. */
+  profit_share_pct?: number | null;
 }
 export interface BudgetLine {
   id: string; job_id: string; code: string; name: string; budget_cents: number; bought_out: boolean; sort: number;

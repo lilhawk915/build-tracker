@@ -1,3 +1,4 @@
+import { ourShare } from '../domain/budget';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Empty, FileLink, JobStatus } from '../components/ui';
@@ -38,6 +39,7 @@ function Hit({ hit, query, cash }: { hit: JobHit; query: string; cash?: JobMoney
               <dd className={cash.profit !== null && cash.profit < 0 ? 'bad' : ''} title={cash.basis === 'budget' ? 'Amount minus the forecast cost in the job budget' : cash.basis === 'quote' ? "From the accepted quote's profit, plus change orders" : 'Add a budget or accept a quote onto this job to see profit'}>
                 {cash.profit === null ? '—' : money(cash.profit)}
               </dd>
+              {cash.profit !== null && ourShare(cash.profit, job.profit_share_pct) !== null && <dd className="small">Your {job.profit_share_pct}%: {money(ourShare(cash.profit, job.profit_share_pct)!)}</dd>}
             </div>
           </dl>
         )}

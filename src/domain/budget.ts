@@ -46,6 +46,12 @@ export function rollupLines(lines: BudgetLine[], pos: Po[], bills: Bill[], cos: 
 }
 
 /** Flag a line when the share of its budget spent runs this many points ahead of the share of work done. */
+/** Our part of a job's profit on a partner deal, or null when the profit is all ours. */
+export function ourShare(profitCents: number, pct: number | null | undefined): number | null {
+  if (pct === null || pct === undefined || Number.isNaN(Number(pct))) return null;
+  return Math.round((profitCents * Number(pct)) / 100);
+}
+
 export const PACE_GAP = 15;
 
 export interface LineProgress {

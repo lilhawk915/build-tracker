@@ -161,6 +161,8 @@ export function seed(): DB {
     notes: 'Buyer loved the open kitchen. Basement stayed dry through spring rains.',
   });
   const oak = db.jobs.find((j) => j.id === 'oak')!;
+  // A partner deal: we get half the profit.
+  db.jobs.find((j) => j.id === 'cedar')!.profit_share_pct = 50;
   // Walk-through checklists on the cover-up steps; one partly walked.
   for (const c of standardChecksFor(db.tasks.filter((t) => t.status !== 'done'))) db.step_checks.push({ ...c, id: crypto.randomUUID() });
   const dryIn = db.step_checks.filter((c) => c.task_id === named('Frame house').id);

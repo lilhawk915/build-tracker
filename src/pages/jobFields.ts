@@ -12,6 +12,7 @@ export const jobFields: FieldDef[] = [
   { key: 'lender', label: 'Lender' },
   { key: 'interest_rate', label: 'Loan interest rate (%)', type: 'number', help: 'Yearly, like 12. Used to show what each day on the job costs.' },
   { key: 'holding_monthly_cents', label: 'Other carrying costs per month', type: 'money', help: 'Taxes, insurance, utilities. Optional.' },
+  { key: 'profit_share_pct', label: 'Your share of the profit (%)', type: 'number', help: 'For partner deals, like 50. Leave blank if the profit is all yours.' },
   { key: 'start_date', label: 'Start date', type: 'date' },
   { key: 'target_finish', label: 'Target finish', type: 'date' },
   { key: 'finish_date', label: 'Actual finish', type: 'date' },

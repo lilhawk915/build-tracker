@@ -6,7 +6,7 @@ import type { Bill, ChangeOrder, Photo, Profile, TableName, Tables, Task, Waiver
 import { seed, type DB } from './seed';
 import { rowKey, type Store } from './store';
 
-const KEY = 'build-tracker-demo-v11';
+const KEY = 'build-tracker-demo-v12';
 const WHO = 'build-tracker-demo-who';
 const NUMBERED = new Set<TableName>(['pos', 'change_orders', 'draws']);
 const files = new Map<string, string>();

@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Empty, FormModal, HealthChip, money, Tape, TapeLegend, JobStatus } from '../components/ui';
 import { store, useData } from '../data';
 import { attention, type Attention } from '../domain/attention';
-import { rollupJob } from '../domain/budget';
+import { ourShare, rollupJob } from '../domain/budget';
 import { todayIso } from '../domain/rules';
 import { copyPlan, starterBudget, starterSchedule } from '../domain/templates';
 import { isNewHouse, type JobType } from '../domain/types';
@@ -57,7 +57,11 @@ export function Today() {
         <Tape budget={r.revised} paid={r.paid} billed={r.billed} committed={r.committed} />
         <dl className="figs">
           <div><dt>Paid of budget</dt><dd>{money(r.paid)} / {money(r.revised)}</dd></div>
-          <div><dt>Expected profit</dt><dd>{money(r.forecastMargin)}</dd></div>
+          <div>
+            <dt>Expected profit</dt>
+            <dd>{money(r.forecastMargin)}</dd>
+            {ourShare(r.forecastMargin, job.profit_share_pct) !== null && <div className="small">Your {job.profit_share_pct}%: <b>{money(ourShare(r.forecastMargin, job.profit_share_pct)!)}</b></div>}
+          </div>
           <div><dt>Tasks done</dt><dd>{done} of {tasks.length}</dd></div>
         </dl>
       </Link>

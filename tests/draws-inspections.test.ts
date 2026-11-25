@@ -74,3 +74,12 @@ describe('inspections', () => {
     expect(out.inspections[0]).toMatchObject({ task_id: out.tasks[0].id, job_id: 'new', result: 'not_scheduled', fail_count: 0, vendor_id: null });
   });
 });
+
+describe('profit share', () => {
+  it('is our part of the profit, or null when it is all ours', async () => {
+    const { ourShare } = await import('../src/domain/budget');
+    expect(ourShare(5544000, 50)).toBe(2772000);
+    expect(ourShare(5544000, null)).toBeNull();
+    expect(ourShare(-100000, 50)).toBe(-50000);
+  });
+});
