@@ -216,6 +216,11 @@ export const localStore: Store = {
         row.review_note = '';
         row.vendor_id ??= null;
         row.task_id ??= null;
+        row.taken_at ??= null; row.lat ??= null; row.lng ??= null;
+        row.created_at ??= new Date().toISOString();
+        // same rule as the database: only the office shares, and only approved photos
+        if (me().role === 'sub' || row.review_status !== 'approved') row.client_visible = false;
+        row.client_visible ??= false;
       }
       if (table === 'materials') {
         for (const k of ['order_number', 'notes', 'quantity', 'supplier']) row[k] ??= '';
@@ -240,8 +245,10 @@ export const localStore: Store = {
     } else if (table === 'photos') {
       const p = patch as Partial<Photo>;
       if (p.review_status === 'rejected' && !p.review_note?.trim()) throw new Error('Say why this photo is disapproved, so the contractor knows what to fix.');
+      if (me().role === 'sub' && 'client_visible' in p) throw new Error('Only the office can share a photo with the client.');
       Object.assign(row, p);
       if (p.review_status === 'approved') row.review_note = '';
+      if (row.review_status !== 'approved') row.client_visible = false;
     } else if (table === 'tasks') {
       // Same rule as the database: new dates or a new sub means they need to hear about it again.
       const before = { ...row };

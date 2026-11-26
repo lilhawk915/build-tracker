@@ -128,6 +128,10 @@ export interface DailyLog { id: string; job_id: string; log_date: string; weathe
 export interface Photo {
   id: string; job_id: string; vendor_id: string | null; task_id: string | null; file_path: string; caption: string;
   review_status: 'pending' | 'approved' | 'rejected'; review_note: string;
+  /** When the shot was taken, and where (job-site camera). Null on older photos. */
+  taken_at?: string | null; lat?: number | null; lng?: number | null;
+  /** Office-only switch: shown on the client's page. Never true unless approved. */
+  client_visible?: boolean; created_at?: string;
 }
 export interface Selection {
   id: string; job_id: string; category: string; room: string; item: string; brand: string; color_name: string;

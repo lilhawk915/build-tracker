@@ -561,6 +561,29 @@ describe('material requests from crew', () => {
   });
 });
 
+describe('job-site camera', () => {
+  it('stores when and where a photo was taken', async () => {
+    const [p] = await as<{ taken_at: unknown; lat: number; lng: number; client_visible: boolean }>(STAFF,
+      `insert into public.photos (job_id, file_path, taken_at, lat, lng) values ($1,$2,now(),39.01,-83.92) returning taken_at, lat, lng, client_visible`, [JOB, `${JOB}/cam.jpg`]);
+    expect(p.taken_at).toBeTruthy();
+    expect([p.lat, p.lng]).toEqual([39.01, -83.92]);
+    expect(p.client_visible).toBe(false);
+  });
+  it("won't let a contractor share a photo with the client, on the way in or after", async () => {
+    const [p] = await as<{ id: string; client_visible: boolean }>(SUB_A,
+      `insert into public.photos (job_id, vendor_id, file_path, client_visible) values ($1,$2,$3,true) returning id, client_visible`, [JOB, VA, `vendor/${VA}/c.jpg`]);
+    expect(p.client_visible).toBe(false);
+    expect(await as(SUB_A, `update public.photos set client_visible = true where id = $1 returning id`, [p.id])).toHaveLength(0);
+  });
+  it('never shows the client a photo that is not approved', async () => {
+    const [p] = await as<{ id: string }>(SUB_A, `insert into public.photos (job_id, vendor_id, file_path) values ($1,$2,$3) returning id`, [JOB, VA, `vendor/${VA}/d.jpg`]);
+    const [r] = await as<{ client_visible: boolean }>(STAFF, `update public.photos set client_visible = true where id = $1 returning client_visible`, [p.id]);
+    expect(r.client_visible).toBe(false);
+    const [ok] = await as<{ client_visible: boolean }>(STAFF, `update public.photos set review_status = 'approved', client_visible = true where id = $1 returning client_visible`, [p.id]);
+    expect(ok.client_visible).toBe(true);
+  });
+});
+
 describe('contractor photos', () => {
   const send = (who: string, vendor: string, extra = '', extraVal = '') =>
     as<{ id: string; review_status: string }>(who,

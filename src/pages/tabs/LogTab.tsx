@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Empty, FormModal } from '../../components/ui';
 import { store, useData } from '../../data';
-import { safeFileName } from '../../data/store';
 import { todayIso, niceDate } from '../../domain/rules';
 import type { Job, Photo } from '../../domain/types';
+import { JobPhotos } from './JobPhotos';
 
 export function Thumb({ photo }: { photo: Photo }) {
   const [url, setUrl] = useState('');
@@ -18,7 +18,7 @@ export function Thumb({ photo }: { photo: Photo }) {
     <figure>
       {failed ? <div className="muted small" style={{ height: 110 }}>File not available.</div>
         : pdf ? <a href={url} target="_blank" rel="noopener noreferrer">Open PDF</a>
-        : url ? <img src={url} alt={photo.caption || 'Job site photo'} loading="lazy" /> : <div style={{ height: 110 }} />}
+        : url ? <a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={photo.caption || 'Job site photo'} loading="lazy" /></a> : <div style={{ height: 110 }} />}
       {photo.caption && <figcaption>{photo.caption}</figcaption>}
     </figure>
   );
@@ -27,7 +27,6 @@ export function Thumb({ photo }: { photo: Photo }) {
 export function LogTab({ job }: { job: Job }) {
   const { data, run, me } = useData();
   const [adding, setAdding] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [rejecting, setRejecting] = useState<Photo | null>(null);
   const logs = data.daily_logs.filter((l) => l.job_id === job.id).sort((a, b) => b.log_date.localeCompare(a.log_date));
   const mine = data.photos.filter((p) => p.job_id === job.id);
@@ -42,7 +41,6 @@ export function LogTab({ job }: { job: Job }) {
       <div className="row between">
         <h2>Site log</h2>
         <div className="row">
-          <button className="btn" onClick={() => setUploading(true)}>Add a photo</button>
           <button className="btn primary" onClick={() => setAdding(true)}>Add a log entry</button>
         </div>
       </div>
@@ -63,7 +61,7 @@ export function LogTab({ job }: { job: Job }) {
           </div>
         </section>
       )}
-      {photos.length > 0 && <div className="photos">{photos.map((p) => <Thumb key={p.id} photo={p} />)}</div>}
+      <JobPhotos job={job} photos={photos} />
       {rejected.length > 0 && (
         <details>
           <summary>Disapproved photos ({rejected.length})</summary>
@@ -116,25 +114,6 @@ export function LogTab({ job }: { job: Job }) {
           onClose={() => setAdding(false)}
           onSave={async (v) => {
             if (await run(() => store.insert('daily_logs', { ...v, job_id: job.id, author: me.name } as never), 'Entry added.')) setAdding(false);
-          }}
-        />
-      )}
-      {uploading && (
-        <FormModal
-          title="Add a photo"
-          submit="Add photo"
-          fields={[
-            { key: 'file', label: 'Photo or PDF', type: 'file', required: true },
-            { key: 'caption', label: 'Caption' },
-          ]}
-          onClose={() => setUploading(false)}
-          onSave={async ({ file, caption }) => {
-            const f = file as File;
-            const ok = await run(async () => {
-              const file_path = await store.upload(`${job.id}/${crypto.randomUUID()}-${safeFileName(f.name)}`, f);
-              await store.insert('photos', { job_id: job.id, file_path, caption: caption as string });
-            }, 'Photo added.');
-            if (ok) setUploading(false);
           }}
         />
       )}
