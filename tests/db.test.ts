@@ -817,7 +817,7 @@ describe('estimates and expenses', () => {
 
 describe('job types', () => {
   it('accepts every type and a note, and refuses unknown ones', async () => {
-    for (const t of ['spec', 'client', 'flip', 'remodel', 'addition', 'repair', 'other']) {
+    for (const t of ['spec', 'client', 'rental', 'flip', 'remodel', 'addition', 'repair', 'other']) {
       await as(STAFF, `insert into public.jobs (name, job_type, type_note) values ($1, $2, 'Deck')`, [`T ${t}`, t]);
     }
     await expect(as(STAFF, `insert into public.jobs (name, job_type) values ('Bad', 'nonsense')`)).rejects.toThrow();

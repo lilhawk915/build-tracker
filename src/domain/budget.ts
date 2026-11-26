@@ -46,6 +46,15 @@ export function rollupLines(lines: BudgetLine[], pos: Po[], bills: Bill[], cos: 
 }
 
 /** Flag a line when the share of its budget spent runs this many points ahead of the share of work done. */
+/**
+ * A rental we keep: there is no profit. The refi has to pay back the whole cost.
+ * loanToValue is that cost as a percent of the finished value: the loan-to-value the refi needs to pull all the money out.
+ */
+export function rentalRefi(valueCents: number, costCents: number) {
+  const loanToValue = valueCents > 0 ? Math.round((costCents * 1000) / valueCents) / 10 : null;
+  return { value: valueCents, cost: costCents, equity: valueCents - costCents, loanToValue };
+}
+
 /** Our part of a job's profit on a partner deal, or null when the profit is all ours. */
 export function ourShare(profitCents: number, pct: number | null | undefined): number | null {
   if (pct === null || pct === undefined || Number.isNaN(Number(pct))) return null;

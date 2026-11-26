@@ -83,3 +83,11 @@ describe('profit share', () => {
     expect(ourShare(-100000, 50)).toBe(-50000);
   });
 });
+
+describe('rental to keep', () => {
+  it('has no profit, just the refi that pays the cost back', async () => {
+    const { rentalRefi } = await import('../src/domain/budget');
+    expect(rentalRefi(40000000, 30000000)).toEqual({ value: 40000000, cost: 30000000, equity: 10000000, loanToValue: 75 });
+    expect(rentalRefi(0, 30000000).loanToValue).toBeNull();
+  });
+});

@@ -8,7 +8,8 @@ import { attention, type Attention } from '../domain/attention';
 import { ourShare, rollupJob } from '../domain/budget';
 import { todayIso } from '../domain/rules';
 import { copyPlan, starterBudget, starterSchedule } from '../domain/templates';
-import { isNewHouse, type JobType } from '../domain/types';
+import { isNewHouse, isRental, type JobType } from '../domain/types';
+import { RentalFig } from './RentalFig';
 import { jobFields } from './jobFields';
 
 export function Today() {
@@ -57,11 +58,15 @@ export function Today() {
         <Tape budget={r.revised} paid={r.paid} billed={r.billed} committed={r.committed} />
         <dl className="figs">
           <div><dt>Paid of budget</dt><dd>{money(r.paid)} / {money(r.revised)}</dd></div>
-          <div>
-            <dt>Expected profit</dt>
-            <dd>{money(r.forecastMargin)}</dd>
-            {ourShare(r.forecastMargin, job.profit_share_pct) !== null && <div className="small">Your {job.profit_share_pct}%: <b>{money(ourShare(r.forecastMargin, job.profit_share_pct)!)}</b></div>}
-          </div>
+          {isRental(job.job_type) ? (
+            <RentalFig value={r.salePrice} cost={r.forecast} />
+          ) : (
+            <div>
+              <dt>Expected profit</dt>
+              <dd>{money(r.forecastMargin)}</dd>
+              {ourShare(r.forecastMargin, job.profit_share_pct) !== null && <div className="small">Your {job.profit_share_pct}%: <b>{money(ourShare(r.forecastMargin, job.profit_share_pct)!)}</b></div>}
+            </div>
+          )}
           <div><dt>Tasks done</dt><dd>{done} of {tasks.length}</dd></div>
         </dl>
       </Link>

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Empty, FormModal, lineTape, money, Tape, TapeLegend } from '../../components/ui';
 import { store, useData } from '../../data';
 import { jobPctDone, lineProgress, ourShare, rollupJob, rollupLines } from '../../domain/budget';
-import { isOwnProject, type BudgetLine, type Job } from '../../domain/types';
+import { RentalFig } from '../RentalFig';
+import { isOwnProject, isRental, type BudgetLine, type Job } from '../../domain/types';
 
 export function BudgetTab({ job }: { job: Job }) {
   const { data, run } = useData();
@@ -22,10 +23,15 @@ export function BudgetTab({ job }: { job: Job }) {
     <div className="stack">
       <div className="panel stack">
         <dl className="figs strip">
-          <div><dt>{isOwnProject(job.job_type) ? 'Expected sale' : 'Contract with changes'}</dt><dd>{money(r.salePrice)}</dd></div>
+          <div><dt>{isRental(job.job_type) ? 'Value when finished' : isOwnProject(job.job_type) ? 'Expected sale' : 'Contract with changes'}</dt><dd>{money(r.salePrice)}</dd></div>
           <div><dt>Expected final cost</dt><dd>{money(r.forecast)}</dd></div>
-          <div><dt>Expected profit</dt><dd>{money(r.forecastMargin)}</dd></div>
-          {ourShare(r.forecastMargin, job.profit_share_pct) !== null && <div><dt>Your {job.profit_share_pct}% share</dt><dd>{money(ourShare(r.forecastMargin, job.profit_share_pct)!)}</dd></div>}
+          {isRental(job.job_type) ? (
+            <>
+              <RentalFig value={r.salePrice} cost={r.forecast} />
+              <div><dt>Equity after the refi</dt><dd>{money(r.salePrice - r.forecast)}</dd></div>
+            </>
+          ) : <div><dt>Expected profit</dt><dd>{money(r.forecastMargin)}</dd></div>}
+          {!isRental(job.job_type) && ourShare(r.forecastMargin, job.profit_share_pct) !== null && <div><dt>Your {job.profit_share_pct}% share</dt><dd>{money(ourShare(r.forecastMargin, job.profit_share_pct)!)}</dd></div>}
           <div><dt>Paid so far</dt><dd>{money(r.paid)}</dd></div>
           <div><dt>Left to finish</dt><dd>{money(leftTotal)}</dd></div>
           {pctDone != null && <div><dt>Work done, by budget</dt><dd>{pctDone}%</dd></div>}

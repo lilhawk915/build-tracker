@@ -27,19 +27,22 @@ export interface Expense {
   category: string; amount_cents: number; paid: boolean; file_path: string | null;
 }
 
-export type JobType = 'spec' | 'client' | 'flip' | 'remodel' | 'addition' | 'repair' | 'other';
+export type JobType = 'spec' | 'client' | 'rental' | 'flip' | 'remodel' | 'addition' | 'repair' | 'other';
 export const JOB_TYPES: { value: JobType; label: string }[] = [
   { value: 'spec', label: 'Spec home' },
   { value: 'client', label: 'Client build' },
+  { value: 'rental', label: 'Rental to keep' },
   { value: 'flip', label: 'Flip' },
   { value: 'remodel', label: 'Remodel' },
   { value: 'addition', label: 'Addition' },
   { value: 'repair', label: 'Repair or small job' },
   { value: 'other', label: 'Other' },
 ];
-export const isNewHouse = (t: JobType) => t === 'spec' || t === 'client';
-// Jobs you own and sell, as opposed to work a customer pays you for.
-export const isOwnProject = (t: JobType) => t === 'spec' || t === 'flip';
+export const isNewHouse = (t: JobType) => t === 'spec' || t === 'client' || t === 'rental';
+// Jobs you own, as opposed to work a customer pays you for.
+export const isOwnProject = (t: JobType) => t === 'spec' || t === 'flip' || t === 'rental';
+// Built to keep (a multifamily, say): no sale and no profit. The goal is a refi that pays back everything put in.
+export const isRental = (t: JobType) => t === 'rental';
 
 export interface Vendor {
   id: string; name: string; trade: string;

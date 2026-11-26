@@ -4,7 +4,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Empty, FileLink, JobStatus } from '../components/ui';
 import { useData } from '../data';
 import { highlightParts, jobYear, KIND_LABEL, search, type JobHit, type SearchKind } from '../domain/search';
-import { JOB_TYPES, jobTypeLabel } from '../domain/types';
+import { JOB_TYPES, isRental, jobTypeLabel } from '../domain/types';
+import { RentalFig } from './RentalFig';
 import { money } from '../domain/csv';
 import { useEstimating } from '../estimator/ui';
 import { jobMoney, type JobMoney } from './jobMoney';
@@ -33,14 +34,16 @@ function Hit({ hit, query, cash }: { hit: JobHit; query: string; cash?: JobMoney
         </div>
         {cash && (
           <dl className="jobcash" aria-label={`${job.name} amount and profit`}>
-            <div><dt>Amount</dt><dd>{money(cash.amount)}</dd></div>
+            {isRental(job.job_type) ? (
+              <><div><dt>Value</dt><dd>{money(cash.amount)}</dd></div><RentalFig value={cash.amount} cost={cash.amount - (cash.profit ?? cash.amount)} /></>
+            ) : <><div><dt>Amount</dt><dd>{money(cash.amount)}</dd></div>
             <div>
               <dt>Projected profit</dt>
               <dd className={cash.profit !== null && cash.profit < 0 ? 'bad' : ''} title={cash.basis === 'budget' ? 'Amount minus the forecast cost in the job budget' : cash.basis === 'quote' ? "From the accepted quote's profit, plus change orders" : 'Add a budget or accept a quote onto this job to see profit'}>
                 {cash.profit === null ? '—' : money(cash.profit)}
               </dd>
               {cash.profit !== null && ourShare(cash.profit, job.profit_share_pct) !== null && <dd className="small">Your {job.profit_share_pct}%: {money(ourShare(cash.profit, job.profit_share_pct)!)}</dd>}
-            </div>
+            </div></>}
           </dl>
         )}
         <JobStatus s={job.status} />
@@ -83,7 +86,8 @@ export function SearchPage() {
   const hits = useMemo(() => search(data, q, { kind, year, vendorId, jobType }), [data, q, kind, year, vendorId, jobType]);
   // Price and profit are for admins only, like the rest of the money.
   const cash = useMemo(() => (isAdmin ? new Map(data.jobs.map((j) => [j.id, jobMoney(j, data, catalog, settings)])) : null), [isAdmin, data, catalog, settings]);
-  const shownCash = cash ? hits.map((h) => cash.get(h.job.id)!).filter(Boolean) : [];
+  // Rentals we keep aren't sales, so they stay out of the work and profit totals.
+  const shownCash = cash ? hits.filter((h) => !isRental(h.job.job_type)).map((h) => cash.get(h.job.id)!).filter(Boolean) : [];
   const years = [...new Set(data.jobs.map(jobYear).filter(Boolean))].sort().reverse();
   const vendors = [...data.vendors].sort((a, b) => a.name.localeCompare(b.name));
   const filtered = Boolean(q.trim() || kind || year || vendorId || jobType);
